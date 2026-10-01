@@ -398,7 +398,56 @@ dim_chains:
       if (!inside) editVB = f;
       vb = editVB;
     }
-    return drawPlanSVG(esvg, spec, walls, { viewBox: vb });
+    const out = drawPlanSVG(esvg, spec, walls, { viewBox: vb });
+    drawSelection(spec, out);
+    return out;
+  }
+  // Selected room: gold outline + a rotate handle in its top-right corner.
+  let selRoom = null;
+  function handleOf(spec, vb) {
+    const r = selRoom && spec.rooms.find((rr) => rr.name === selRoom);
+    if (!r) return null;
+    const rad = Math.max(vb[2] / 45, Math.min(r.w, r.h) / 7, 0.5);
+    return { r, cx: r.x + r.w - rad * 1.3, cy: r.y + r.h - rad * 1.3, rad };
+  }
+  function drawSelection(spec, vb) {
+    $("rotRoom").disabled = !(selRoom && spec.rooms.some((rr) => rr.name === selRoom));
+    if (typeof drag !== "undefined" && drag && drag.hit && drag.hit.kind !== "room") return;
+    const h = handleOf(spec, vb);
+    if (!h) return;
+    const sw = vb[2] / 300, r = h.r;
+    el("rect", { x: r.x, y: -(r.y + r.h), width: r.w, height: r.h, style: `fill:none;stroke:var(--gold);stroke-width:${sw};stroke-dasharray:${sw * 4} ${sw * 3};pointer-events:none` }, esvg);
+    const g = el("g", { style: "cursor:pointer" }, esvg);
+    el("circle", { cx: h.cx, cy: -h.cy, r: h.rad, style: `fill:var(--gold);stroke:var(--sheet);stroke-width:${sw}` }, g);
+    const t = el("text", { x: h.cx, y: -h.cy, "text-anchor": "middle", "dominant-baseline": "central", style: `font:700 ${h.rad * 1.5}px var(--body);fill:#0D1B2A;pointer-events:none` }, g);
+    t.textContent = "⟳";
+    const tt = el("title", {}, g); tt.textContent = "Rotate room 90°";
+  }
+  // Rotate a room 90° counter-clockwise about its center; doors and windows move with their walls.
+  function rotateRoom(spec, name) {
+    const s2 = clone(spec), r = s2.rooms.find((rr) => rr.name === name);
+    if (!r) return null;
+    const cx = r.x + r.w / 2, cy = r.y + r.h / 2, w = r.w, h = r.h;
+    r.w = h; r.h = w;
+    r.x = snapTo(cx - r.w / 2); r.y = snapTo(cy - r.h / 2);
+    const MAP = { S: "E", E: "N", N: "W", W: "S" };
+    for (const list of ["doors", "windows"]) for (const o of s2[list] || []) {
+      if (o.room !== name) continue;
+      const flip = o.side === "E" || o.side === "W";
+      o.offset = r4(flip ? h - o.offset - o.width : o.offset);
+      o.side = MAP[o.side];
+    }
+    return s2;
+  }
+  function doRotate() {
+    if (!lastSpec || !selRoom) return;
+    const s2 = rotateRoom(lastSpec, selRoom);
+    if (!s2) return;
+    undo.push(ta.value); $("undoBtn").disabled = false;
+    ta.value = toYAML(s2);
+    const r = s2.rooms.find((rr) => rr.name === selRoom);
+    renderEdit();
+    $("dragInfo").textContent = `🟢 ${r.name} rotated 90°: now ${D.ftin(r.w)} × ${D.ftin(r.h)} at (${D.ftin(r.x)}, ${D.ftin(r.y)}); its doors and windows moved with their walls`;
   }
 
   async function renderSpec(spec, opts = {}) {
@@ -414,6 +463,14 @@ dim_chains:
     const gate = D.validate(spec, tier), chains = chainStatus(spec);
     const failed = gate.report.filter((r) => r.problems.length);
     const chainsBad = chains.filter((c) => !c.ok);
+    // two rooms can't claim the same floor
+    const overlaps = [];
+    spec.rooms.forEach((a, i) => spec.rooms.forEach((b, j) => {
+      if (j <= i) return;
+      const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      if (w > 1e-6 && h > 1e-6) overlaps.push(`${a.name} and ${b.name} overlap by ${fmt(w * h, 1)} sf`);
+    }));
+    if (overlaps.length) chainsBad.push(...overlaps);
     $("editStatus").textContent = `Tier ${tier} · ${gate.released && !chainsBad.length ? "released" : tier === 1 ? "advisory" : "held"}`;
     const fp = await D.fingerprint(walls);
     if (my !== token) return; // a newer render has started
@@ -424,6 +481,7 @@ dim_chains:
         : !c.closes ? ["b", `<span class="num">${segs} = ${D.ftin(c.sum)} ≠ ${D.ftin(c.chain.overall)}</span> — dimension string refused, fix the spec`]
         : ["b", `Dimension string ends at <span class="num">${c.offWall.map(D.ftin).join(", ")}</span> where there is no wall — refused`]);
     }
+    for (const o of overlaps) rows.push(["b", `${o} — rooms can't share floor area`]);
     if (tier === 2) rows.push(failed.length ? ["b", `Gate: ${failed.length} room${failed.length > 1 ? "s" : ""} fail — not released as permit-intent`] : ["f", "Gate: every room meets the minimums — released"]);
     else rows.push(["i", `Tier 1 is advisory: ${failed.length ? failed.length + " issue(s) noted, not enforced" : "no issues noted"}`]);
     facts($("editFacts"), rows);
@@ -607,8 +665,11 @@ dim_chains:
   let drag = null;
   esvg.addEventListener("pointerdown", (ev) => {
     if (!lastSpec || ev.button > 0) return;
-    const p = toWorld(ev), hit = hitTest(lastSpec, p);
-    if (!hit) return;
+    const p = toWorld(ev), vbb = esvg.viewBox.baseVal, hd = handleOf(lastSpec, [vbb.x, vbb.y, vbb.width, vbb.height]);
+    if (hd && Math.hypot(p[0] - hd.cx, p[1] - hd.cy) <= hd.rad * 1.2) { ev.preventDefault(); doRotate(); return; }
+    const hit = hitTest(lastSpec, p);
+    if (!hit) { if (selRoom) { selRoom = null; renderEdit(); } return; }
+    if (hit.kind === "room") selRoom = lastSpec.rooms[hit.i].name;
     ev.preventDefault();
     esvg.setPointerCapture(ev.pointerId);
     const vb = esvg.viewBox.baseVal;
@@ -618,7 +679,9 @@ dim_chains:
   esvg.addEventListener("pointermove", (ev) => {
     if (!drag) {
       if (!lastSpec || ev.pointerType !== "mouse") return;
-      const h = hitTest(lastSpec, toWorld(ev));
+      const pw = toWorld(ev), vbh = esvg.viewBox.baseVal, hd = handleOf(lastSpec, [vbh.x, vbh.y, vbh.width, vbh.height]);
+      if (hd && Math.hypot(pw[0] - hd.cx, pw[1] - hd.cy) <= hd.rad * 1.2) { esvg.style.cursor = "pointer"; return; }
+      const h = hitTest(lastSpec, pw);
       esvg.style.cursor = !h ? "default" : h.kind === "room" ? "move" : h.kind === "opening" ? "grab"
         : h.edge.axis === "x" ? "ew-resize" : "ns-resize";
       return;
@@ -635,6 +698,11 @@ dim_chains:
     drag = null; frozenVB = null;
     renderEdit();
   }
+  esvg.setAttribute("tabindex", "0");
+  esvg.addEventListener("keydown", (ev) => {
+    if ((ev.key === "r" || ev.key === "R") && selRoom) { ev.preventDefault(); doRotate(); }
+  });
+  $("rotRoom").addEventListener("click", doRotate);
   esvg.addEventListener("pointerup", endDrag);
   esvg.addEventListener("pointercancel", endDrag);
 

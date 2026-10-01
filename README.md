@@ -24,12 +24,15 @@ No install and no sign-up. It runs in your browser on a phone or a desktop.
 Every move snaps to real feet and inches and is written back into the spec as
 numbers, then the walls, dimension strings, code check and fingerprint are
 recomputed. Walls that share a line move together, like a real wall, and
-dimension strings follow the walls they measure.
+dimension strings follow the walls they measure. Rotate a room 90° with its ⟳
+handle (or R): its doors and windows move with their walls, and overlapping
+rooms are flagged 🔴.
 
 ![Dragging a wall: the spec, dimensions and code check update together](docs/img/drag.png)
 
 **Site plans: setbacks are measured, not eyeballed.** Drag or rotate a house,
-drainfield and well on an example lot, then add construction logistics
+drainfield and well on an example lot (rotate any of them with the gold ⟳
+handle, 5° steps or 1° with Shift), then add construction logistics
 (crew parking, delivery truck, staging, dumpster, porta-john) to scale and keep
 them off the red no-drive zones. Every clearance is measured edge to edge
 between the real shapes and drawn live, and the building envelope is computed by

@@ -164,10 +164,11 @@ footer p{margin:0 0 6px;max-width:90ch}
   <section aria-labelledby="t3">
     <div class="test-no">Test 3 · the dimensions are the truth</div>
     <h2 id="t3">Drag it or type it. The numbers stay true.</h2>
-    <p class="intro">Drag any wall, room, door or window on the plan. Every move snaps to real feet and inches and is written back into the spec, so the walls, the dimension strings, the code check and the fingerprint are recomputed from numbers — never from where the pixels landed. You can also type in the spec directly, or try a preset that the engine refuses.</p>
+    <p class="intro">Drag any wall, room, door or window on the plan, and rotate rooms with ⟳. Every move snaps to real feet and inches and is written back into the spec, so the walls, the dimension strings, the code check and the fingerprint are recomputed from numbers — never from where the pixels landed. You can also type in the spec directly, or try a preset that the engine refuses.</p>
     <div class="controls">
       <label class="num" style="display:inline-flex;align-items:center;gap:6px">Snap
         <select id="snap"><option value="0.083333">1"</option><option value="0.25" selected>3"</option><option value="0.5">6"</option><option value="1">1'-0"</option></select></label>
+      <button type="button" class="alt" id="rotRoom" disabled title="Select a room first (or press R)">⟳ Rotate room 90°</button>
       <button type="button" class="alt" id="undoBtn" disabled>Undo</button>
       <button type="button" class="alt" data-preset="good">Reset cottage</button>
       <button type="button" class="alt" data-preset="gate">Bedroom with no window</button>
@@ -178,7 +179,7 @@ footer p{margin:0 0 6px;max-width:90ch}
       <div class="panel">
         <div class="panel-h"><h3>Plan · drag to edit</h3><span class="tag" id="editStatus">—</span></div>
         <svg class="view edit" id="editSvg" role="img" aria-label="Editable floor plan drawn from the spec"></svg>
-        <div class="draginfo" id="dragInfo" aria-live="polite">Drag a wall to stretch it, the middle of a room to move it, or a door or window to slide it.</div>
+        <div class="draginfo" id="dragInfo" aria-live="polite">Drag a wall to stretch it, the middle of a room to move it, or a door or window to slide it. Tap a room, then ⟳ (or press R) to rotate it 90°.</div>
         <ul class="facts" id="editFacts"></ul>
         <div class="scroll" style="padding:0 14px 14px"><table class="gate" id="gateTable"></table></div>
         <div style="padding:0 14px 16px;display:flex;gap:10px;flex-wrap:wrap"><button type="button" id="dxfBtn">Download DXF</button></div>
@@ -194,7 +195,7 @@ footer p{margin:0 0 6px;max-width:90ch}
   <section aria-labelledby="t4">
     <div class="test-no">Test 4 · site plan</div>
     <h2 id="t4">Setbacks are measured, not eyeballed</h2>
-    <p class="intro">Drag the house, drainfield or well around the lot, or rotate them. Then plan the job: add crew parking, a delivery truck, staging, a dumpster and a porta-john, all to scale, and keep them off the red no-drive zones. Every clearance is measured edge to edge between the real shapes, drawn on the plan as you move, and checked against the rule. The dashed line is the building envelope, computed by moving each lot line in by its setback.</p>
+    <p class="intro">Drag the house, drainfield or well around the lot. To rotate, select one and drag its gold ⟳ handle (5° steps, hold Shift for 1°), use the ↶ ↷ buttons, or press R. Then plan the job: add crew parking, a delivery truck, staging, a dumpster and a porta-john, all to scale, and keep them off the red no-drive zones. Every clearance is measured edge to edge between the real shapes, drawn on the plan as you move, and checked against the rule. The dashed line is the building envelope, computed by moving each lot line in by its setback.</p>
     <div class="controls">
       <label class="num" style="display:inline-flex;align-items:center;gap:6px">Snap
         <select id="siteSnap"><option value="0.5">6"</option><option value="1" selected>1'-0"</option><option value="5">5'-0"</option></select></label>

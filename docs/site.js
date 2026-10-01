@@ -210,6 +210,14 @@ items:
     building: "fill:var(--bldg-fill);stroke:var(--wall)",
     drainfield: "fill:var(--df-fill);stroke:var(--df)",
   };
+  // Rotate handle: a knob above the selected item's top edge, in the item's own frame.
+  function rotHandle(s) {
+    const it = s.items.find((i) => i.id === sel);
+    if (!it || it.kind === "well" || !vb) return null;
+    const a = rad(it.rot || 0), off = it.h / 2 + vb[2] / 22, r = vb[2] / 70;
+    const top = [it.x - Math.sin(a) * (it.h / 2), it.y + Math.cos(a) * (it.h / 2)];
+    return { it, r, top, p: [it.x - Math.sin(a) * off, it.y + Math.cos(a) * off] };
+  }
   function draw(s, checks) {
     svg.innerHTML = "";
     if (!vb) vb = viewBox(s);
@@ -276,6 +284,14 @@ items:
       const mx = (c.r.a[0] + c.r.b[0]) / 2, my = (c.r.a[1] + c.r.b[1]) / 2;
       const lab = c.r.outside ? "OUTSIDE" : c.r.overlap ? "OVERLAP" : D.ftin(c.r.d);
       const t = text(mx + fs * 0.4, my + fs * 0.3, lab, `fill:${col};font-weight:700;paint-order:stroke;stroke:var(--sheet);stroke-width:${fs * 0.25}px`, "start");
+    }
+    // rotate handle on the selected item
+    const rh = rotHandle(s);
+    if (rh) {
+      el("line", { x1: rh.top[0], y1: -rh.top[1], x2: rh.p[0], y2: -rh.p[1], style: `stroke:var(--gold);stroke-width:${sw * 1.6}` }, svg);
+      el("circle", { cx: rh.p[0], cy: -rh.p[1], r: rh.r, style: `fill:var(--gold);stroke:var(--sheet);stroke-width:${sw}` }, svg);
+      const t = el("text", { x: rh.p[0], y: -rh.p[1], "text-anchor": "middle", "dominant-baseline": "central", style: `font:700 ${rh.r * 1.5}px var(--body);fill:#0D1B2A;pointer-events:none` }, svg);
+      t.textContent = "⟳";
     }
     // north arrow
     const nx = vb[0] + vb[2] - fs * 1.5, ny = -(vb[1] + fs * 3.2);
@@ -349,7 +365,13 @@ items:
   function pushHistory() { history.push(ta.value); if (history.length > 50) history.shift(); $("siteUndo").disabled = false; }
   svg.addEventListener("pointerdown", (ev) => {
     if (!state) return;
-    const p = toWorld(ev), it = hit(p);
+    const p = toWorld(ev), rh = rotHandle(state);
+    if (rh && Math.hypot(p[0] - rh.p[0], p[1] - rh.p[1]) <= rh.r * 1.8) {
+      ev.preventDefault(); svg.setPointerCapture(ev.pointerId);
+      drag = { id: rh.it.id, rotate: true, before: ta.value, moved: false };
+      return;
+    }
+    const it = hit(p);
     sel = it ? it.id : null;
     if (it) {
       ev.preventDefault(); svg.setPointerCapture(ev.pointerId);
@@ -359,8 +381,19 @@ items:
   });
   svg.addEventListener("pointermove", (ev) => {
     if (!state) return;
-    if (!drag) { if (ev.pointerType === "mouse") svg.style.cursor = hit(toWorld(ev)) ? "move" : "default"; return; }
+    if (!drag) {
+      if (ev.pointerType !== "mouse") return;
+      const pw = toWorld(ev), rh = rotHandle(state);
+      svg.style.cursor = rh && Math.hypot(pw[0] - rh.p[0], pw[1] - rh.p[1]) <= rh.r * 1.8 ? "grab" : hit(pw) ? "move" : "default";
+      return;
+    }
     const p = toWorld(ev), it = state.items.find((i) => i.id === drag.id);
+    if (drag.rotate) { // angle of the pointer around the item's center; 5° steps, Shift for 1°
+      const step = ev.shiftKey ? 1 : 5, deg = (Math.atan2(p[1] - it.y, p[0] - it.x) * 180) / Math.PI - 90;
+      it.rot = ((Math.round(deg / step) * step + 540) % 360) - 180; drag.moved = true;
+      render(state, true);
+      return;
+    }
     it.x = snapV(p[0] + drag.dx); it.y = snapV(p[1] + drag.dy); drag.moved = true;
     render(state, true);
   });
@@ -368,6 +401,14 @@ items:
     if (drag && drag.moved && drag.before !== ta.value) { history.push(drag.before); $("siteUndo").disabled = false; }
     drag = null;
   }
+  svg.setAttribute("tabindex", "0");
+  svg.addEventListener("keydown", (ev) => {
+    const it = state && state.items.find((i) => i.id === sel); if (!it) return;
+    const n = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[ev.key];
+    if (n) { ev.preventDefault(); pushHistory(); it.x = snapV(it.x + n[0] * snap()); it.y = snapV(it.y + n[1] * snap()); render(state, true); }
+    else if ((ev.key === "r" || ev.key === "R") && it.kind !== "well") { ev.preventDefault(); rotate((it.rot || 0) + (ev.shiftKey ? -15 : 15)); }
+    else if ((ev.key === "Delete" || ev.key === "Backspace") && it.kind === "logistics") { ev.preventDefault(); $("siteDel").click(); }
+  });
   svg.addEventListener("pointerup", end);
   svg.addEventListener("pointercancel", end);
   function rotate(to) {
