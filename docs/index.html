@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FieldComm Draw</title>
+<meta name="description" content="Image generators guess pixels. FieldComm Draw solves polygon math. Same spec, same drawing, every time — and the dimensions are the truth.">
+<meta name="theme-color" content="#0D1B2A">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: drafting-sheet. Navy title band, then three numbered tests (the order is the argument), then the open-source footer. */
+:root{
+  --ink:#0D1B2A; --paper:#F3F1EA; --sheet:#FFFFFF; --rule:#D6D9DE; --muted:#5B6776;
+  --gold:#C9A84C; --wall:#1C2430; --glass:#2F6FB3; --door:#8A94A0;
+  --fact:#1D7A4C; --fact-bg:#E3F3EA; --interp:#9A6A00; --interp-bg:#FBF0CF; --block:#B42318; --block-bg:#FCE7E4;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#0E151D;--sheet:#151F2A;--rule:#26323F;--muted:#9AA7B5;--wall:#E5EAF0;--door:#7C8896;--glass:#6FA8E6;--fact-bg:#0F2E20;--interp-bg:#33270A;--block-bg:#3A1612;--fact:#4CC38A;--interp:#E6B44A;--block:#F2785F;color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#0E151D;--sheet:#151F2A;--rule:#26323F;--muted:#9AA7B5;--wall:#E5EAF0;--door:#7C8896;--glass:#6FA8E6;--fact-bg:#0F2E20;--interp-bg:#33270A;--block-bg:#3A1612;--fact:#4CC38A;--interp:#E6B44A;--block:#F2785F;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--wall);font:16px/1.55 var(--body)}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:16px}
+a{color:inherit}
+header{background:#0D1B2A;color:#fff;border-bottom:4px solid var(--gold);padding-block:44px 36px}
+.eyebrow{font:500 12px var(--mono);letter-spacing:.16em;color:var(--gold);text-transform:uppercase}
+h1{font:700 clamp(38px,7.5vw,68px)/.98 var(--display);text-transform:uppercase;margin:12px 0 16px;letter-spacing:.01em;text-wrap:balance}
+.lede{max-width:66ch;color:#D2DBE5;margin:0 0 22px;font-size:1.08rem}
+.lede b{color:#fff}
+.legend{display:flex;flex-wrap:wrap;gap:10px}
+.tm{display:inline-flex;align-items:center;gap:7px;font:500 13px var(--mono);padding:5px 10px;border-radius:999px;white-space:nowrap}
+.tm.f{background:var(--fact-bg);color:var(--fact)} .tm.i{background:var(--interp-bg);color:var(--interp)} .tm.b{background:var(--block-bg);color:var(--block)}
+header .tm.f{background:#12382A;color:#7BE0AE} header .tm.i{background:#3B2E08;color:#F2C760} header .tm.b{background:#43160F;color:#FF9A85}
+main{display:grid;gap:56px;padding-block:44px 64px}
+.test-no{font:500 12px var(--mono);letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+h2{font:700 clamp(28px,4.4vw,40px)/1.05 var(--display);text-transform:uppercase;margin:6px 0 10px;text-wrap:balance}
+.intro{max-width:70ch;color:var(--muted);margin:0 0 18px}
+.pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+.panel{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;overflow:hidden;display:grid;grid-template-rows:auto auto 1fr;min-width:0;align-content:start}
+.draginfo{padding:8px 14px;font:500 13px var(--mono);color:var(--fact);background:var(--fact-bg);border-top:1px solid var(--rule);min-height:2.6em}
+svg.edit{touch-action:none;cursor:default;user-select:none;-webkit-user-select:none}
+select{font:500 14px var(--mono);padding:6px 8px;border:1px solid var(--rule);border-radius:4px;background:var(--sheet);color:var(--wall)}
+.panel-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:12px 14px;border-bottom:1px solid var(--rule)}
+.panel-h h3{font:700 20px var(--display);text-transform:uppercase;margin:0;letter-spacing:.02em}
+.panel-h .tag{font:500 11px var(--mono);color:var(--muted);text-align:right}
+.view{background:var(--sheet);display:block;width:100%;aspect-ratio:4/3;max-width:100%}
+canvas.view{image-rendering:auto}
+.facts{list-style:none;margin:0;padding:12px 14px 14px;display:grid;gap:8px;border-top:1px solid var(--rule);font-size:.93rem}
+.facts li{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;min-width:0}
+.facts .tm{font-size:11px;padding:2px 8px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 14px}
+button,.btn{font:600 16px var(--display);letter-spacing:.06em;text-transform:uppercase;padding:9px 16px;border-radius:4px;border:1px solid #0D1B2A;background:#0D1B2A;color:#fff;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+button.alt,.btn.alt{background:transparent;color:var(--wall);border-color:var(--rule)}
+button:focus-visible,.btn:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.tally{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px;margin-top:16px}
+.tally div{padding:12px 14px;border-radius:6px;font-size:.95rem}
+.tally .l{background:var(--interp-bg);color:var(--interp)} .tally .r{background:var(--fact-bg);color:var(--fact)}
+.tally b{font:700 22px var(--display);display:block;letter-spacing:.02em}
+.disclose{font-size:.85rem;color:var(--muted);margin:10px 0 0;max-width:80ch}
+.zoomrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px}
+.zoomrow label{font:600 15px var(--display);text-transform:uppercase;letter-spacing:.06em}
+#zoom{flex:1 1 220px;max-width:420px}
+.editor{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+textarea{width:100%;min-height:440px;font:13px/1.5 var(--mono);background:var(--sheet);color:var(--wall);border:1px solid var(--rule);border-radius:6px;padding:12px;resize:vertical;tab-size:2;white-space:pre;overflow:auto}
+.err{background:var(--block-bg);color:var(--block);padding:10px 12px;border-radius:6px;font:500 13px var(--mono);margin-top:10px}
+.gate{width:100%;border-collapse:collapse;font-size:.88rem}
+.gate th,.gate td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--rule)}
+.gate th{font:600 12px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.gate td.n{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:16px;counter-reset:s}
+.how div{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:16px}
+.how h3{font:700 20px var(--display);text-transform:uppercase;margin:0 0 6px}
+.how h3::before{counter-increment:s;content:counter(s) " · ";color:var(--gold)}
+.how p{margin:0;color:var(--muted);font-size:.95rem}
+.oss{background:#0D1B2A;color:#D2DBE5;border-radius:6px;padding:22px;display:flex;flex-wrap:wrap;gap:16px;align-items:center}
+.oss h2{color:#fff;margin:0 0 6px}
+.oss p{margin:0;max-width:62ch}
+.oss .txt{flex:1 1 380px;min-width:0}
+.oss .btns{display:flex;flex-wrap:wrap;gap:10px}
+.oss .btn{background:var(--gold);border-color:var(--gold);color:#0D1B2A}
+.oss .btn.alt{background:transparent;color:#fff;border-color:#4A5A6C}
+footer{border-top:1px solid var(--rule);padding-block:20px 44px;color:var(--muted);font-size:.85rem}
+footer p{margin:0 0 6px;max-width:90ch}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow">FieldComm Draw · free live demo</div>
+    <h1>Same spec. Same drawing. Every time.</h1>
+    <p class="lede">Image generators <b>guess pixels</b>. Ask twice and walls wander, a bath disappears, and the dimension label no longer matches the drawing. FieldComm Draw <b>solves polygon math</b> from a written spec: the dimensions are the truth, the drawing follows them exactly, and a fingerprint proves it.</p>
+    <div class="legend" aria-label="Truth markers">
+      <span class="tm f">🟢 FACT — computed from geometry, provable</span>
+      <span class="tm i">🟡 INTERPRETATION — read off pixels, unproven</span>
+      <span class="tm b">🔴 BLOCKED — fails a check, won't release</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section aria-labelledby="t1">
+    <div class="test-no">Test 1 · repeatability</div>
+    <h2 id="t1">Generate the same house again</h2>
+    <p class="intro">Both sides get the same house: a 38 ft × 31 ft, three-bedroom cottage. Press generate a few times. The left side behaves the way image models do when they draw plans; the right side is the engine.</p>
+    <div class="controls">
+      <button type="button" id="gen1">Generate again</button>
+      <button type="button" class="alt" id="gen10">Run 10 times</button>
+      <button type="button" class="alt" id="genReset">Reset</button>
+    </div>
+    <div class="pair">
+      <div class="panel">
+        <div class="panel-h"><h3>Pixel generation</h3><span class="tag">simulated · guesses pixels</span></div>
+        <canvas class="view" id="pixCanvas" width="640" height="480" role="img" aria-label="Simulated image-generated floor plan"></canvas>
+        <ul class="facts" id="pixFacts"></ul>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h3>Spec → polygon math</h3><span class="tag">FieldComm Draw engine</span></div>
+        <svg class="view" id="specSvg" role="img" aria-label="Engine-drawn floor plan"></svg>
+        <ul class="facts" id="specFacts"></ul>
+      </div>
+    </div>
+    <div class="tally">
+      <div class="l" id="tallyL"><b>0 generations</b>Press generate.</div>
+      <div class="r" id="tallyR"><b>0 generations</b>Press generate.</div>
+    </div>
+    <p class="disclose">The left panel is an illustrative simulation of typical image-model behavior (walls shift, rooms resize or vanish, labels stay the same). It is not output from any specific product. The right panel is the real engine running in your browser.</p>
+  </section>
+
+  <section aria-labelledby="t2">
+    <div class="test-no">Test 2 · scale</div>
+    <h2 id="t2">Zoom in on one corner</h2>
+    <p class="intro">This is the corner where the living room, bedroom 1 and the hall meet, at x = 24 ft, y = 15 ft. A picture only knows its pixels; zooming makes them bigger, not more accurate. Geometry stays exact at any scale.</p>
+    <div class="zoomrow">
+      <label for="zoom">Zoom</label>
+      <input type="range" id="zoom" min="1" max="32" step="1" value="1">
+      <span class="num" id="zoomOut">1×</span>
+    </div>
+    <div class="pair">
+      <div class="panel">
+        <div class="panel-h"><h3>Picture of the plan</h3><span class="tag">raster · 300 px wide</span></div>
+        <canvas class="view" id="zoomPix" width="640" height="480" role="img" aria-label="Zoomed raster plan"></canvas>
+        <ul class="facts" id="zoomPixFacts"></ul>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h3>The geometry</h3><span class="tag">vector · feet</span></div>
+        <svg class="view" id="zoomSvg" role="img" aria-label="Zoomed vector plan"></svg>
+        <ul class="facts" id="zoomSvgFacts"></ul>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="t3">
+    <div class="test-no">Test 3 · the dimensions are the truth</div>
+    <h2 id="t3">Drag it or type it. The numbers stay true.</h2>
+    <p class="intro">Drag any wall, room, door or window on the plan. Every move snaps to real feet and inches and is written back into the spec, so the walls, the dimension strings, the code check and the fingerprint are recomputed from numbers — never from where the pixels landed. You can also type in the spec directly, or try a preset that the engine refuses.</p>
+    <div class="controls">
+      <label class="num" style="display:inline-flex;align-items:center;gap:6px">Snap
+        <select id="snap"><option value="0.083333">1"</option><option value="0.25" selected>3"</option><option value="0.5">6"</option><option value="1">1'-0"</option></select></label>
+      <button type="button" class="alt" id="undoBtn" disabled>Undo</button>
+      <button type="button" class="alt" data-preset="good">Reset cottage</button>
+      <button type="button" class="alt" data-preset="gate">Bedroom with no window</button>
+      <button type="button" class="alt" data-preset="chain">Wrong dimension string</button>
+      <label class="num" style="display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="tier2" checked> Tier 2 (code enforced)</label>
+    </div>
+    <div class="editor">
+      <div class="panel">
+        <div class="panel-h"><h3>Plan · drag to edit</h3><span class="tag" id="editStatus">—</span></div>
+        <svg class="view edit" id="editSvg" role="img" aria-label="Editable floor plan drawn from the spec"></svg>
+        <div class="draginfo" id="dragInfo" aria-live="polite">Drag a wall to stretch it, the middle of a room to move it, or a door or window to slide it.</div>
+        <ul class="facts" id="editFacts"></ul>
+        <div class="scroll" style="padding:0 14px 14px"><table class="gate" id="gateTable"></table></div>
+        <div style="padding:0 14px 16px;display:flex;gap:10px;flex-wrap:wrap"><button type="button" id="dxfBtn">Download DXF</button></div>
+      </div>
+      <div>
+        <label for="specText" class="test-no">Spec (YAML, feet) · updates as you drag</label>
+        <textarea id="specText" spellcheck="false" wrap="off"></textarea>
+        <div id="specErr" class="err" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="how">
+    <h2 id="how">How it works</h2>
+    <div class="how">
+      <div><h3>Write the spec</h3><p>Rooms as rectangles in feet, doors and windows by wall and offset. A person or an AI can write it; it's plain text you can read and check.</p></div>
+      <div><h3>Gate it</h3><p>Room sizes and bedroom egress are checked against code minimums before anything is drawn. Tier 1 advises, Tier 2 enforces.</p></div>
+      <div><h3>Solve the geometry</h3><p>Walls are polygon math: offsets, unions and openings in feet. No model touches the drawing. Same input, identical geometry.</p></div>
+      <div><h3>Prove it</h3><p>A SHA-256 fingerprint of the walls is recorded every run. Change nothing and it never changes. The DXF opens in free QCAD or any CAD.</p></div>
+    </div>
+  </section>
+
+  <section class="oss" aria-labelledby="oss">
+    <div class="txt">
+      <h2 id="oss">Free demo. Pro engine.</h2>
+      <p>This page is free to use and share. The full FieldComm Draw engine (layered CAD sheets, fixtures, title blocks, site plans and AI drafting skills) is in private development. Sponsoring keeps it moving and gets you early access.</p>
+    </div>
+    <div class="btns">
+      <a class="btn" href="https://github.com/sponsors/wswaldmann-lgtm" target="_blank" rel="noopener">♥ Sponsor</a>
+      <a class="btn alt" href="https://github.com/wswaldmann-lgtm/fieldcomm-draw-public" target="_blank" rel="noopener">View on GitHub</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Schematic and concept drawings only — not for construction. Plans for permit must be prepared or reviewed and sealed by a licensed architect or engineer as your jurisdiction requires. Code minimums shown are planning baselines (FBC 2023 Residential / IRC 2021), not a substitute for review by your building department.</p>
+    <p>This page runs a browser port of the FieldComm Draw wall geometry and code gate; on the example plans it produces the same walls as the full engine (0.000 sq ft difference). Fixtures, title blocks and layered sheets are in the full engine.</p>
+    <p>© 2026 FieldComm Consulting LLC · uses polygon-clipping and js-yaml (MIT).</p>
+  </div>
+</footer>
+
+<script src="vendor/polygon-clipping.umd.min.js"></script>
+<script src="vendor/js-yaml.min.js"></script>
+<script src="engine.js"></script>
+<script src="demo.js"></script>
+</body>
+</html>

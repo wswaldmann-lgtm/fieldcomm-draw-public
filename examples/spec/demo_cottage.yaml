@@ -1,0 +1,45 @@
+# DEMO — fictional 3-bedroom cottage. Not a real project, not for construction.
+project: "Demo Cottage (fictional) - 3 BR / 1 BA"
+units: feet
+wall_system: {exterior: "2x6", interior: "2x4"}
+rooms:
+  - {name: "Living / Kitchen", type: living,      x: 0,  y: 0,  w: 24, h: 15}
+  - {name: "Bedroom 1",        type: bedroom,     x: 24, y: 0,  w: 14, h: 15}
+  - {name: "Laundry",          type: utility,     x: 0,  y: 15, w: 8,  h: 4}
+  - {name: "Hall",             type: circulation, x: 8,  y: 15, w: 30, h: 4}
+  - {name: "Bedroom 2",        type: bedroom,     x: 0,  y: 19, w: 12, h: 12}
+  - {name: "Bath",             type: bathroom,    x: 12, y: 19, w: 8,  h: 12}
+  - {name: "Bedroom 3",        type: bedroom,     x: 20, y: 19, w: 18, h: 12}
+  - {name: "Front Porch",      type: porch,       x: 0,  y: -6, w: 24, h: 6}
+doors:
+  - {room: "Living / Kitchen", side: S, offset: 10, width: 3}
+  - {room: "Living / Kitchen", side: N, offset: 9,  width: 4, type: cased}
+  - {room: "Bedroom 1",        side: N, offset: 2,  width: 2.7}
+  - {room: "Laundry",          side: E, offset: 0.7, width: 2.5}
+  - {room: "Bedroom 2",        side: S, offset: 9,  width: 2.7}
+  - {room: "Bath",             side: S, offset: 2,  width: 2.5}
+  - {room: "Bedroom 3",        side: S, offset: 2,  width: 2.7}
+windows:
+  - {room: "Living / Kitchen", side: S, offset: 3,  width: 5}
+  - {room: "Living / Kitchen", side: W, offset: 4,  width: 5}
+  - {room: "Bedroom 1",        side: E, offset: 5,  width: 4}
+  - {room: "Bedroom 1",        side: S, offset: 5,  width: 4}
+  - {room: "Bedroom 2",        side: N, offset: 4,  width: 4}
+  - {room: "Bedroom 2",        side: W, offset: 4,  width: 4}
+  - {room: "Bath",             side: N, offset: 3,  width: 2}
+  - {room: "Bedroom 3",        side: N, offset: 7,  width: 4}
+  - {room: "Bedroom 3",        side: E, offset: 4,  width: 4}
+fixtures:
+  - {type: tub,          x: 12.3, y: 28.3, length: 5, depth: 2.5, drain: W}
+  - {type: toilet,       cx: 18.6, cy: 22.5, facing: W}
+  - {type: vanity,       x: 12.3, y: 19.3, length: 4, depth: 1.8, wall: S}
+  - {type: cabinets,     x: 14, y: 13.4, length: 7, depth: 1.5}
+  - {type: fridge,       x: 21, y: 12.4}
+dim_chains:
+  - {p0: [0, 31], segments: [12, 8, 18], overall: 38, orient: H, side: 1, offset: 2.5}
+  - {p0: [0, 0],  segments: [15, 4, 12], overall: 31, orient: V, side: -1, offset: 3.5}
+title_block:
+  address: "Fictional demo lot"
+  date: "2026-10-01"
+  revision: "R0"
+  datum: "DEMO - local grid, origin at living room SW corner, plan north up"

@@ -1,0 +1,13 @@
+# DEMO — a deliberately non-compliant ADU. Tier 2 must REFUSE to release it.
+project: "ADU (gate test — deliberately non-compliant)"
+units: feet
+rooms:
+  - {name: "Living / Kitchen", type: living,   x: 0,  y: 0, w: 16, h: 15}
+  - {name: "Bedroom",          type: bedroom,  x: 16, y: 6, w: 8,  h: 8}   # 64 sf, under 70
+  - {name: "Bath",             type: bathroom, x: 16, y: 0, w: 6,  h: 6}
+doors:
+  - {room: "Living / Kitchen", side: S, offset: 6, width: 3}
+  - {room: "Bedroom",          side: W, offset: 2, width: 2.7}
+windows:
+  - {room: "Living / Kitchen", side: W, offset: 4, width: 5}
+  # NOTE: bedroom intentionally has NO window -> egress violation

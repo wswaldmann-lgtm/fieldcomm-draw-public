@@ -1,0 +1,77 @@
+# FieldComm Draw
+
+**Same spec. Same drawing. Every time.**
+
+Image generators *guess pixels*. Ask one for a floor plan twice and the walls
+wander, a bathroom disappears, and the "38'-0"" label stays put while the drawing
+under it shrinks or stretches. That's fine for a mood board. It's useless for
+anything you build from.
+
+FieldComm Draw takes the opposite approach: **the dimensions are the truth and
+the drawing is computed from them.** A plan is a short text spec in feet. A
+deterministic engine checks it against code minimums, solves the walls as polygon
+math, and fingerprints the result. Same spec in, identical geometry out.
+
+### ▶ [Try the live demo](https://wswaldmann-lgtm.github.io/fieldcomm-draw-public/)
+
+No install and no sign-up. It runs in your browser on a phone or a desktop.
+
+| Repeatability | Scale |
+|---|---|
+| ![Ten generations: pixels drift, the engine's fingerprint never changes](docs/img/repeatability.png) | ![At 16× the picture is blocks of pixels; the geometry is still exact](docs/img/zoom.png) |
+
+**Drag and drop, without the drift.** Drag any wall, room, door or window.
+Every move snaps to real feet and inches and is written back into the spec as
+numbers, then the walls, dimension strings, code check and fingerprint are
+recomputed. Walls that share a line move together, like a real wall, and
+dimension strings follow the walls they measure.
+
+![Dragging a wall: the spec, dimensions and code check update together](docs/img/drag.png)
+
+## Fact vs. interpretation
+
+Every number the demo shows is marked:
+
+- 🟢 **FACT**: computed from the geometry; anyone can reproduce it.
+- 🟡 **INTERPRETATION**: read off pixels; an estimate, not proven.
+- 🔴 **BLOCKED**: fails a check; the engine refuses rather than draws a wrong number.
+
+A dimension string that doesn't add up, or doesn't land on a real wall, is
+refused. A bedroom without an egress window holds the plan at Tier 2.
+
+## The full engine
+
+This repository is the free public demo and the [spec format](SPEC.md). The full
+FieldComm Draw engine is in private development:
+
+- Layered DXF sheets for CAD (opens in free QCAD or AutoCAD)
+- Fixture symbols, title blocks and sheet sets
+- Site plans with setbacks, buildings and parking
+- AI drafting skills: an assistant writes the spec, and the engine draws and gates it
+
+**[Sponsor the project](https://github.com/sponsors/wswaldmann-lgtm)** to keep it
+moving and get early access. Questions and ideas are welcome in
+[Issues](https://github.com/wswaldmann-lgtm/fieldcomm-draw-public/issues).
+
+## What's here
+
+| Path | What it is |
+|---|---|
+| `docs/` | The live demo (published to GitHub Pages) |
+| `SPEC.md` | The spec format and room minimums (CC BY 4.0) |
+| `examples/spec/` | Example specs (CC BY 4.0) |
+| `examples/img/` | The same examples rendered by the full engine |
+| `tests/` | Engine checks: determinism, wall areas against the full engine, gate, dimension strings |
+
+## Not for construction
+
+FieldComm Draw produces schematic and concept drawings. Plans for permit must be
+prepared or reviewed and sealed by a licensed architect or engineer as your
+jurisdiction requires. Code minimums are planning baselines, not a substitute for
+review by your building department.
+
+## License
+
+© 2026 FieldComm Consulting LLC. All rights reserved: you may use and share the
+demo and read the code, but not copy or reuse it. The spec format and examples are
+CC BY 4.0. See [LICENSE](LICENSE).

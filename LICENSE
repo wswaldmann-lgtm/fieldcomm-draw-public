@@ -1,0 +1,22 @@
+FieldComm Draw — Demo
+Copyright (c) 2026 FieldComm Consulting LLC. All rights reserved.
+
+You may use the live demo, view this source code, and link to or share the
+demo freely.
+
+Without written permission from FieldComm Consulting LLC you may not copy,
+modify, redistribute, sublicense, sell, or include this code (or derivatives
+of it) in any other product, website, or service.
+
+Exceptions:
+  * The example specs in examples/spec/ and the spec format described in
+    SPEC.md are licensed under Creative Commons Attribution 4.0 (CC BY 4.0):
+    use them for anything, with credit to "FieldComm Draw".
+  * Third-party libraries in docs/vendor/ are under their own MIT licenses,
+    included next to each file.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. Drawings it
+produces are schematic and not for construction.
+
+Licensing inquiries: open an issue at
+https://github.com/wswaldmann-lgtm/fieldcomm-draw-public/issues
