@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FieldComm Planner</title>
+<meta name="description" content="Drag-and-drop two-week production planner for construction crews. Capacity, trade and sequence checked live; planned rates are estimates until actual output measures them.">
+<meta name="theme-color" content="#0D1B2A">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: navy title band; status strip; backlog (left) beside a crew × day board (scrolls sideways inside its own box). */
+:root{
+  --ink:#0D1B2A; --paper:#F3F1EA; --sheet:#FFFFFF; --rule:#D6D9DE; --muted:#5B6776; --wall:#1C2430; --gold:#C9A84C; --knob:#FFF6D5; --knob-line:#C9A84C;
+  --fact:#1D7A4C; --fact-bg:#E3F3EA; --interp:#9A6A00; --interp-bg:#FBF0CF; --block:#B42318; --block-bg:#FCE7E4; --target:#EAF2FB; --out:#E6E7EA;
+  --framing:#7d6a48; --roofing:#5b6b8c; --plumbing:#2f6fb3; --electrical:#b8860b;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#0E151D;--sheet:#151F2A;--rule:#26323F;--muted:#9AA7B5;--wall:#E5EAF0;--knob:#3A3015;--knob-line:#8a7430;--fact-bg:#0F2E20;--interp-bg:#33270A;--block-bg:#3A1612;--fact:#4CC38A;--interp:#E6B44A;--block:#F2785F;--target:#16283B;--out:#222b35;color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#0E151D;--sheet:#151F2A;--rule:#26323F;--muted:#9AA7B5;--wall:#E5EAF0;--knob:#3A3015;--knob-line:#8a7430;--fact-bg:#0F2E20;--interp-bg:#33270A;--block-bg:#3A1612;--fact:#4CC38A;--interp:#E6B44A;--block:#F2785F;--target:#16283B;--out:#222b35;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--wall);font:15px/1.5 var(--body)}
+.wrap{max-width:1400px;margin:0 auto;padding-inline:16px}
+header{background:#0D1B2A;color:#fff;border-bottom:4px solid var(--gold);padding-block:28px 22px}
+.eyebrow{font:500 12px var(--mono);letter-spacing:.16em;color:var(--gold);text-transform:uppercase}
+.eyebrow a{color:var(--gold)}
+h1{font:700 clamp(32px,6vw,54px)/1 var(--display);text-transform:uppercase;margin:10px 0 10px}
+.lede{max-width:72ch;color:#D2DBE5;margin:0}
+main{padding-block:20px 48px;display:grid;gap:14px}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:600 15px var(--display);letter-spacing:.06em;text-transform:uppercase;padding:7px 12px;border-radius:4px;border:1px solid var(--rule);background:var(--sheet);color:var(--wall);cursor:pointer}
+button.pri{background:#0D1B2A;color:#fff;border-color:#0D1B2A}
+button:focus-visible,input:focus-visible,[data-act]:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.stat{font:12px var(--mono);color:var(--muted)}
+.hint{background:var(--knob);border:1px solid var(--knob-line);border-radius:6px;padding:8px 12px;font-size:14px}
+.status{list-style:none;margin:0;padding:12px 14px;background:var(--sheet);border:1px solid var(--rule);border-radius:6px;display:grid;gap:6px;font-size:14px}
+.status li{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start}
+.tm{display:inline-flex;font:500 11px var(--mono);padding:2px 8px;border-radius:999px;white-space:nowrap}
+.tm.f{background:var(--fact-bg);color:var(--fact)} .tm.i{background:var(--interp-bg);color:var(--interp)} .tm.b{background:var(--block-bg);color:var(--block)}
+.board{display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:900px){.board{grid-template-columns:1fr}}
+.backlog{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.backlog h2,.gridbox h2{font:700 18px var(--display);text-transform:uppercase;margin:0;padding:10px 12px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.backlog h2 span,.gridbox h2 span{font:500 11px var(--mono);color:var(--muted);text-transform:none}
+.act{padding:9px 12px;border-bottom:1px solid var(--rule);cursor:pointer;display:grid;gap:3px}
+.act:hover{background:var(--target)}
+.act.sel{background:var(--target);box-shadow:inset 4px 0 0 var(--gold)}
+.act.full{opacity:.6}
+.act .r1{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.act .r2{font-size:12.5px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.muted{color:var(--muted);font-size:12px}
+.lft{color:var(--block)} .okc{color:var(--fact)}
+.trade{font:500 10px var(--mono);text-transform:uppercase;color:#fff;padding:1px 6px;border-radius:3px}
+.trade.framing{background:var(--framing)}.trade.roofing{background:var(--roofing)}.trade.plumbing{background:var(--plumbing)}.trade.electrical{background:var(--electrical)}
+.rate{width:52px;font:13px var(--mono);padding:1px 4px;border:1px solid var(--rule);border-radius:3px;background:var(--sheet);color:var(--wall)}
+.meas{font-size:12px;color:var(--fact)}
+.use{font-size:12px;padding:1px 6px}
+.bar{height:5px;background:var(--rule);border-radius:3px;overflow:hidden}.bar>div{height:100%;background:var(--fact)}
+.gridbox{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;min-width:0}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;min-width:1360px;width:100%}
+th,td{border:1px solid var(--rule);vertical-align:top}
+thead th{background:#0D1B2A;color:#fff;font:600 14px var(--display);letter-spacing:.04em;padding:6px;text-align:center;position:sticky;top:0}
+thead th.wk2{border-left:3px solid var(--gold)}
+th.crewh,th.crew{min-width:150px;text-align:left}
+th.crew{padding:6px 8px;background:var(--paper);font-size:13px;position:sticky;left:0;z-index:1}
+td{padding:4px;min-width:120px;background:var(--sheet)}
+td.wk2{border-left:3px solid var(--gold)}
+td.out{background:var(--out)}
+td.target{background:var(--target);outline:2px dashed var(--gold);outline-offset:-3px;cursor:copy}
+td.dragover{outline:3px solid var(--gold);outline-offset:-3px}
+.cap{display:flex;justify-content:space-between;align-items:center;font:11px var(--mono);color:var(--muted);margin-bottom:3px}
+.cap .over{color:var(--block);font-weight:600}
+.outb{font:500 10px var(--mono);padding:1px 5px;letter-spacing:0}
+.outb.on{background:var(--block);color:#fff;border-color:var(--block)}
+.chip{border:1px solid var(--rule);border-left:5px solid var(--muted);border-radius:4px;padding:4px 5px;margin-bottom:4px;background:var(--sheet);font-size:12px;cursor:grab}
+.chip.t-framing{border-left-color:var(--framing)}.chip.t-roofing{border-left-color:var(--roofing)}.chip.t-plumbing{border-left-color:var(--plumbing)}.chip.t-electrical{border-left-color:var(--electrical)}
+.chip.hit{background:var(--fact-bg)}
+.chip.bad{border-color:var(--block)}
+.chip .ct{display:flex;justify-content:space-between;gap:4px;line-height:1.2}
+.chip .x{border:none;background:none;padding:0 2px;font-size:12px;color:var(--muted)}
+.chip .cr{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:2px}
+.chip label{display:inline-flex;gap:3px;align-items:center;font:10px var(--mono);color:var(--muted)}
+.chip input{width:46px;font:12px var(--mono);padding:1px 3px;border:1px solid var(--rule);border-radius:3px;background:var(--sheet);color:var(--wall)}
+.chip input.act{background:var(--knob);border-color:var(--knob-line);font-weight:600}
+.chip input.sm{width:36px}
+.chip .u{font:10px var(--mono);color:var(--muted)}
+.chip .iss{color:var(--block);font-size:11px;line-height:1.25;margin-top:2px}
+footer{color:var(--muted);font-size:13px;padding-bottom:36px}
+@media print{header .lede,.tools,.hint,.backlog,.outb,.chip .x{display:none!important}body{background:#fff}.board{grid-template-columns:1fr}.scroll{overflow:visible}table{min-width:0;font-size:10px}@page{size:landscape;margin:8mm}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow"><a href="./">← FieldComm Draw demo</a> · FieldComm Planner · free demo</div>
+    <h1>Two-week production plan</h1>
+    <p class="lede">Drag work onto crews and days. Each crew-day shows the crew-hours planned against the hours the crew actually has, and the planner checks trade and sequence as you go. Planned rates are estimates until the crew's real output measures them.</p>
+  </div>
+</header>
+<main class="wrap">
+  <div class="tools">
+    <button type="button" class="pri" id="printBtn">Print look-ahead</button>
+    <button type="button" id="csv">Export CSV</button>
+    <button type="button" id="backup">Backup file</button>
+    <button type="button" id="restore">Restore</button>
+    <input type="file" id="restoreFile" accept=".json" hidden>
+    <button type="button" id="reset">Reset demo</button>
+    <span class="stat" id="saveStat"></span>
+    <span class="stat" style="margin-left:auto" id="weekLbl"></span>
+  </div>
+  <div class="hint" id="hint" aria-live="polite"></div>
+  <ul class="status" id="status" aria-live="polite"></ul>
+  <div class="board">
+    <section class="backlog" aria-labelledby="blh"><h2 id="blh">Work to plan <span>fictional cottage</span></h2><div id="backlog"></div></section>
+    <section class="gridbox" aria-labelledby="gh"><h2 id="gh">Crews × days <span>mh = crew-hours</span></h2><div class="scroll" id="grid"></div></section>
+  </div>
+</main>
+<footer class="wrap">
+  <p>Demo data is fictional. Your plan stays in this browser; use Backup to keep a copy. Production rates shown are placeholders, not published standards. © 2026 FieldComm Consulting LLC.</p>
+</footer>
+<script src="planner.js"></script>
+</body>
+</html>
