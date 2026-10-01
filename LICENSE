@@ -12,8 +12,9 @@ Exceptions:
   * The example specs in examples/spec/ and the spec format described in
     SPEC.md are licensed under Creative Commons Attribution 4.0 (CC BY 4.0):
     use them for anything, with credit to "FieldComm Draw".
-  * Third-party libraries in docs/vendor/ are under their own MIT licenses,
-    included next to each file.
+  * Third-party libraries in docs/vendor/ are under their own licenses
+    (polygon-clipping and js-yaml: MIT; pdf.js: Apache-2.0), included next
+    to each file.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. Drawings it
 produces are schematic and not for construction.

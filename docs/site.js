@@ -231,6 +231,7 @@ items:
       text((a[0] + b[0]) / 2, Math.min(a[1], b[1]) - 15, "STREET (example)", "fill:var(--muted);letter-spacing:.1em");
     });
     el("path", { d: pathOf(s.lot), style: `fill:var(--lot);stroke:var(--wall);stroke-width:${sw * 2.2}` }, svg);
+    drawUnderlay(sw, fs);
     // envelope
     for (const poly of envelope(s)) for (const ring of poly)
       el("path", { d: pathOf(ring.slice(0, -1)), style: `fill:none;stroke:var(--muted);stroke-width:${sw};stroke-dasharray:${sw * 6} ${sw * 4}` }, svg);
@@ -365,6 +366,7 @@ items:
   function pushHistory() { history.push(ta.value); if (history.length > 50) history.shift(); $("siteUndo").disabled = false; }
   svg.addEventListener("pointerdown", (ev) => {
     if (!state) return;
+    if (U.mode) { ulDown(ev); return; }
     const p = toWorld(ev), rh = rotHandle(state);
     if (rh && Math.hypot(p[0] - rh.p[0], p[1] - rh.p[1]) <= rh.r * 1.8) {
       ev.preventDefault(); svg.setPointerCapture(ev.pointerId);
@@ -381,6 +383,7 @@ items:
   });
   svg.addEventListener("pointermove", (ev) => {
     if (!state) return;
+    if (U.mode) { ulMove(ev); return; }
     if (!drag) {
       if (ev.pointerType !== "mouse") return;
       const pw = toWorld(ev), rh = rotHandle(state);
@@ -398,6 +401,7 @@ items:
     render(state, true);
   });
   function end() {
+    ulDrag = null;
     if (drag && drag.moved && drag.before !== ta.value) { history.push(drag.before); $("siteUndo").disabled = false; }
     drag = null;
   }
@@ -470,6 +474,209 @@ items:
     const it = state && state.items.find((i) => i.id === sel); if (!it || it.kind !== "logistics") return;
     pushHistory(); state.items = state.items.filter((i) => i !== it); sel = null; render(state, true);
   });
+
+  // ================= UNDERLAY: import a PDF or image, scale it, align it, measure on it =================
+  // Reference only: nothing read off the underlay becomes a fact until it is typed into the spec.
+  const U = { href: null, W: 0, H: 0, fpp: 1, cx: 0, cy: 0, rot: 0, opacity: 0.55, isPdf: false, r: 1, pdf: null, page: 1,
+    name: "", mode: null, pts: [], measure: null, scaleSrc: null };
+  let ulDrag = null;
+  const ftIn = (v) => D.ftin(v);
+  const ulInfo = (html) => { $("ulInfo").innerHTML = html; };
+  const tmI = '<span class="tm i">🟡 INTERP</span> ', tmB = '<span class="tm b">🔴 BLOCKED</span> ', tmF = '<span class="tm f">🟢 FACT</span> ';
+  function ulWorld(px, py) { // image pixel -> world feet
+    const a = rad(U.rot), vx = (px - U.W / 2) * U.fpp, vy = -(py - U.H / 2) * U.fpp;
+    return [U.cx + Math.cos(a) * vx - Math.sin(a) * vy, U.cy + Math.sin(a) * vx + Math.cos(a) * vy];
+  }
+  function ulInside(p) {
+    const a = rad(-U.rot), dx = p[0] - U.cx, dy = p[1] - U.cy;
+    const lx = Math.cos(a) * dx - Math.sin(a) * dy, ly = Math.sin(a) * dx + Math.cos(a) * dy;
+    return Math.abs(lx) <= (U.W * U.fpp) / 2 && Math.abs(ly) <= (U.H * U.fpp) / 2;
+  }
+  function ulKnob() { const a = rad(U.rot), d = vb[2] / 8; return [U.cx - Math.sin(a) * d, U.cy + Math.cos(a) * d]; }
+  function screenFt() { return vb[2] / svg.getBoundingClientRect().width; }
+  function clickTol() { return screenFt() + U.fpp; } // where you clicked + the image's own pixel size
+  function drawUnderlay(sw, fs) {
+    if (!U.href) return;
+    if (document.activeElement !== $("ulAngle")) $("ulAngle").value = (Math.round(U.rot * 10) / 10).toString();
+    const w = U.W * U.fpp, h = U.H * U.fpp;
+    el("image", { href: U.href, x: U.cx - w / 2, y: -U.cy - h / 2, width: w, height: h, preserveAspectRatio: "none",
+      opacity: U.opacity, transform: `rotate(${-U.rot} ${U.cx} ${-U.cy})`, style: "pointer-events:none" }, svg);
+    const gold = `stroke:var(--gold);stroke-width:${sw * 1.6}`;
+    if (U.mode === "move") {
+      const k = ulKnob(), r = vb[2] / 70;
+      el("path", { d: pathOf([ulWorld(0, 0), ulWorld(U.W, 0), ulWorld(U.W, U.H), ulWorld(0, U.H)]), style: `fill:none;${gold};stroke-dasharray:${sw * 5} ${sw * 3}` }, svg);
+      el("line", { x1: U.cx, y1: -U.cy, x2: k[0], y2: -k[1], style: gold }, svg);
+      el("circle", { cx: U.cx, cy: -U.cy, r: r * 0.5, style: "fill:var(--gold)" }, svg);
+      el("circle", { cx: k[0], cy: -k[1], r, style: `fill:var(--gold);stroke:var(--sheet);stroke-width:${sw}` }, svg);
+      const t = el("text", { x: k[0], y: -k[1], "text-anchor": "middle", "dominant-baseline": "central", style: `font:700 ${r * 1.5}px var(--body);fill:#0D1B2A;pointer-events:none` }, svg);
+      t.textContent = "⟳";
+    }
+    const seg = (a, b, col) => {
+      el("line", { x1: a[0], y1: -a[1], x2: b[0], y2: -b[1], style: `stroke:${col};stroke-width:${sw * 1.8}` }, svg);
+      [a, b].forEach((q) => el("circle", { cx: q[0], cy: -q[1], r: sw * 3.5, style: `fill:${col}` }, svg));
+    };
+    if (U.pts.length) { const a = U.pts[0]; el("circle", { cx: a[0], cy: -a[1], r: sw * 3.5, style: "fill:var(--interp)" }, svg); }
+    if (U.pts.length === 2) seg(U.pts[0], U.pts[1], "var(--interp)");
+    if (U.measure) {
+      const [a, b] = U.measure; seg(a, b, "var(--interp)");
+      const t = el("text", { x: (a[0] + b[0]) / 2 + fs * 0.4, y: -((a[1] + b[1]) / 2) - fs * 0.3, style: `font:700 ${fs}px var(--mono);fill:var(--interp);paint-order:stroke;stroke:var(--sheet);stroke-width:${fs * 0.25}px` }, svg);
+      t.textContent = "≈ " + ftIn(Math.hypot(b[0] - a[0], b[1] - a[1]));
+    }
+  }
+  function setMode(m) {
+    U.mode = U.mode === m ? null : m; U.pts = [];
+    $("ulCalForm").hidden = true;
+    ["ulMove", "ulCal", "ulMeasure"].forEach((id) => $(id).setAttribute("aria-pressed", String(U.mode === { ulMove: "move", ulCal: "cal", ulMeasure: "measure" }[id])));
+    svg.style.cursor = U.mode === "move" ? "move" : U.mode ? "crosshair" : "default";
+    const msg = {
+      move: "Drag the underlay to line it up with the lot; drag the gold ⟳ knob to rotate it (1° steps, Shift for 0.1°). Click Move / rotate again when done.",
+      cal: "Click both ends of a dimension you know on the underlay (on the sample: the 220.00′ check dimension).",
+      measure: "Click two points on the underlay to measure between them.",
+    }[U.mode];
+    ulInfo(msg ? "👉 " + msg : ulStatus());
+    render(state, false);
+  }
+  function ulStatus() {
+    if (!U.href) return "No underlay. Import a PDF or image of a survey or plan, or try the sample.";
+    const src = U.scaleSrc === "sheet" ? `sheet scale ${$("ulScale").selectedOptions[0].text}` : U.scaleSrc === "cal" ? "calibrated from a known dimension" : "scale not set";
+    return `${U.scaleSrc ? tmI : tmB}<b>${esc(U.name)}</b> · ${src} · rotated ${(Math.round(U.rot * 10) / 10).toFixed(1)}° · reference only — type what you read off it into the spec to make it a fact.`;
+  }
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function parseFt(t) { // 220, 220.5, 220'-6", 220' 6"
+    const m = String(t).trim().match(/^(\d+(?:\.\d+)?)\s*(?:'|ft)?\s*-?\s*(?:(\d+(?:\.\d+)?)\s*(?:"|in)?)?$/i);
+    return m ? +m[1] + (m[2] ? +m[2] / 12 : 0) : NaN;
+  }
+  function ulDown(ev) {
+    const p = toWorld(ev);
+    if (U.mode === "move") {
+      if (!U.href) return;
+      const k = ulKnob(), r = vb[2] / 70;
+      ev.preventDefault(); svg.setPointerCapture(ev.pointerId);
+      if (Math.hypot(p[0] - k[0], p[1] - k[1]) <= r * 1.8) ulDrag = { rot: true };
+      else if (ulInside(p)) ulDrag = { dx: U.cx - p[0], dy: U.cy - p[1] };
+      return;
+    }
+    if (U.mode === "cal" || U.mode === "measure") {
+      ev.preventDefault();
+      if (U.pts.length >= 2) U.pts = [];
+      U.pts.push(p);
+      if (U.pts.length === 2) {
+        const L = Math.hypot(U.pts[1][0] - U.pts[0][0], U.pts[1][1] - U.pts[0][1]);
+        if (U.mode === "measure") {
+          U.measure = U.pts.slice(); U.pts = [];
+          ulInfo(`${tmI}On the underlay: <b class="num">≈ ${ftIn(L)}</b> ± ${ftIn(clickTol())} (where you clicked + the image's pixel size + the sheet's own accuracy). Type it into the spec to make it a fact.`);
+        } else {
+          $("ulCalForm").hidden = false; $("ulCalFt").focus();
+          ulInfo(`${tmI}Your two clicks are <b class="num">${ftIn(L)}</b> apart at the current scale. Type the real distance and press <b>Set scale</b>.`);
+        }
+      }
+      render(state, false);
+    }
+  }
+  function ulMove(ev) {
+    if (!ulDrag) return;
+    const p = toWorld(ev);
+    if (ulDrag.rot) {
+      const step = ev.shiftKey ? 0.1 : 1, deg = (Math.atan2(p[1] - U.cy, p[0] - U.cx) * 180) / Math.PI - 90;
+      U.rot = ((Math.round(deg / step) * step + 540) % 360) - 180;
+    } else { U.cx = p[0] + ulDrag.dx; U.cy = p[1] + ulDrag.dy; }
+    ulInfo(`👉 Underlay center (${ftIn(U.cx)}, ${ftIn(U.cy)}) · rotated ${U.rot.toFixed(1)}°`);
+    render(state, false);
+  }
+  function applySheetScale() {
+    const v = $("ulScale").value;
+    if (!U.href || !U.isPdf || v === "cal") return;
+    U.fpp = +v / (72 * U.r); U.scaleSrc = "sheet"; // PDF: 72 points per inch, rendered at r px per point
+    ulInfo(ulStatus()); render(state, false);
+  }
+  async function loadPdfLib() {
+    if (window.pdfjsLib) return window.pdfjsLib;
+    await new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = "vendor/pdfjs/pdf.min.js"; sc.onload = ok; sc.onerror = bad; document.head.appendChild(sc); });
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdfjs/pdf.worker.min.js";
+    return window.pdfjsLib;
+  }
+  async function renderPdfPage(n) {
+    const page = await U.pdf.getPage(n), v1 = page.getViewport({ scale: 1 });
+    U.r = Math.min(3, 2400 / Math.max(v1.width, v1.height));
+    const vp = page.getViewport({ scale: U.r }), c = document.createElement("canvas");
+    c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    U.href = c.toDataURL("image/png"); U.W = c.width; U.H = c.height; U.page = n;
+  }
+  function placeFresh() {
+    const xs = state.lot.map((q) => q[0]), ys = state.lot.map((q) => q[1]);
+    U.cx = (Math.min(...xs) + Math.max(...xs)) / 2; U.cy = (Math.min(...ys) + Math.max(...ys)) / 2; U.rot = 0; U.measure = null; U.pts = [];
+    if (!U.scaleSrc) U.fpp = ((Math.max(...xs) - Math.min(...xs)) * 1.4) / U.W; // a guess so it's visible: not a scale
+  }
+  async function openPdf(data, name, presetScale) {
+    ulInfo("Reading the PDF…");
+    try {
+      const lib = await loadPdfLib();
+      U.pdf = await lib.getDocument({ data }).promise; U.isPdf = true; U.name = name; U.scaleSrc = null;
+      await renderPdfPage(1);
+      const sel = $("ulPage"); sel.innerHTML = "";
+      for (let i = 1; i <= U.pdf.numPages; i++) sel.add(new Option("Page " + i, i));
+      $("ulPageWrap").hidden = U.pdf.numPages < 2;
+      $("ulScale").disabled = false;
+      if (presetScale) { $("ulScale").value = presetScale; applySheetScale(); } else $("ulScale").value = "cal";
+      placeFresh(); setTools(true);
+      ulInfo(ulStatus() + (U.scaleSrc ? "" : " Pick the sheet scale printed on it, or Calibrate."));
+      render(state, false);
+    } catch (e) { ulInfo(`${tmB}Couldn't read that PDF (${esc(e.message || e)}).`); }
+  }
+  function openImage(file) {
+    const rd = new FileReader();
+    rd.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        U.href = rd.result; U.W = img.naturalWidth; U.H = img.naturalHeight; U.isPdf = false; U.name = file.name; U.scaleSrc = null; U.pdf = null;
+        $("ulScale").value = "cal"; $("ulScale").disabled = true; $("ulPageWrap").hidden = true;
+        placeFresh(); setTools(true);
+        ulInfo(`${tmB}<b>${esc(file.name)}</b>: a photo or scan has no built-in scale. Click <b>Calibrate</b> and pick two ends of a known dimension.`);
+        render(state, false);
+      };
+      img.src = rd.result;
+    };
+    rd.readAsDataURL(file);
+  }
+  function setTools(on) { ["ulMove", "ulCal", "ulMeasure", "ulRemove", "ulOpacity", "ulAngle"].forEach((id) => { $(id).disabled = !on; }); }
+  $("ulImport").onclick = () => $("ulFile").click();
+  $("ulFile").onchange = async (e) => {
+    const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    if (/pdf$/i.test(f.type) || /\.pdf$/i.test(f.name)) openPdf(new Uint8Array(await f.arrayBuffer()), f.name, null);
+    else if (/^image\//.test(f.type)) openImage(f);
+    else ulInfo(`${tmB}Use a PDF, PNG or JPG.`);
+  };
+  $("ulSample").onclick = async () => {
+    try { const r = await fetch("samples/sample-boundary-sketch.pdf"); openPdf(new Uint8Array(await r.arrayBuffer()), "Sample boundary sketch (fictional, 1″ = 30′)", "30"); }
+    catch (e) { ulInfo(`${tmB}Couldn't load the sample.`); }
+  };
+  $("ulPage").onchange = async (e) => { if (!U.pdf) return; await renderPdfPage(+e.target.value); applySheetScale(); render(state, false); };
+  $("ulScale").onchange = () => { if ($("ulScale").value === "cal") { U.scaleSrc = U.scaleSrc === "sheet" ? null : U.scaleSrc; setMode("cal"); } else applySheetScale(); };
+  $("ulMove").onclick = () => setMode("move");
+  $("ulCal").onclick = () => setMode("cal");
+  $("ulMeasure").onclick = () => setMode("measure");
+  $("ulAngle").onchange = (e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) { U.rot = ((v + 540) % 360) - 180; ulInfo(ulStatus()); render(state, false); } };
+  $("ulOpacity").oninput = (e) => { U.opacity = +e.target.value / 100; render(state, false); };
+  $("ulRemove").onclick = () => { Object.assign(U, { href: null, pdf: null, mode: null, pts: [], measure: null, scaleSrc: null }); setTools(false); $("ulPageWrap").hidden = true; ulInfo(ulStatus()); render(state, false); };
+  $("ulCalApply").onclick = () => {
+    const D2 = parseFt($("ulCalFt").value);
+    if (U.pts.length !== 2 || !(D2 > 0)) { ulInfo(`${tmB}Type the real distance in feet, e.g. 220 or 220'-0".`); return; }
+    const [a, b] = U.pts, L = Math.hypot(b[0] - a[0], b[1] - a[1]), k = D2 / L;
+    const before = U.scaleSrc === "sheet" ? U.fpp : null;
+    U.fpp *= k; U.cx = a[0] + k * (U.cx - a[0]); U.cy = a[1] + k * (U.cy - a[1]); // scale about the first click
+    U.scaleSrc = "cal"; $("ulScale").value = "cal"; $("ulCalForm").hidden = true; U.mode = null; U.pts = [];
+    ["ulMove", "ulCal", "ulMeasure"].forEach((id) => $(id).setAttribute("aria-pressed", "false")); svg.style.cursor = "default";
+    const tol = (clickTol() / D2) * 100;
+    let msg = `${tmI}Scale set so your clicks are <b class="num">${ftIn(D2)}</b> apart (± about ${tol.toFixed(2)}% from click precision).`;
+    if (before) msg += Math.abs(k - 1) < 0.0005 ? ` It matches the printed sheet scale (within ${(Math.abs(k - 1) * 100).toFixed(2)}%).` : ` The printed sheet scale was ${(Math.abs(k - 1) * 100).toFixed(2)}% ${k > 1 ? "short" : "long"} against it${Math.abs(k - 1) > 0.005 ? " — the sheet may have been printed or scanned off-scale" : ""}.`;
+    ulInfo(msg + " Now use Move / rotate to line it up.");
+    render(state, false);
+  };
+  $("ulCalFt").addEventListener("keydown", (e) => { if (e.key === "Enter") $("ulCalApply").click(); });
+  setTools(false); ulInfo(ulStatus());
+  window.FCUnderlay = U; // for tests
 
   ta.value = SITE_TEXT;
   fromText();

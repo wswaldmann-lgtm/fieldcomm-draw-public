@@ -22,6 +22,7 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#0E151D;--sheet:#151F2A;--rule:#26323F;--muted:#9AA7B5;--wall:#E5EAF0;--door:#7C8896;--glass:#6FA8E6;--fact-bg:#0F2E20;--interp-bg:#33270A;--block-bg:#3A1612;--fact:#4CC38A;--interp:#E6B44A;--block:#F2785F;--lot:#1A232D;--water:#173247;--bldg-fill:#26313D;--df:#C9A25A;--df-fill:#3A3020;color-scheme:dark}}
 :root[data-theme="dark"]{--paper:#0E151D;--sheet:#151F2A;--rule:#26323F;--muted:#9AA7B5;--wall:#E5EAF0;--door:#7C8896;--glass:#6FA8E6;--fact-bg:#0F2E20;--interp-bg:#33270A;--block-bg:#3A1612;--fact:#4CC38A;--interp:#E6B44A;--block:#F2785F;--lot:#1A232D;--water:#173247;--bldg-fill:#26313D;--df:#C9A25A;--df-fill:#3A3020;color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--paper);color:var(--wall);font:16px/1.55 var(--body)}
 .wrap{max-width:1120px;margin:0 auto;padding-inline:16px}
 a{color:inherit}
@@ -42,6 +43,8 @@ h2{font:700 clamp(28px,4.4vw,40px)/1.05 var(--display);text-transform:uppercase;
 .panel{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;overflow:hidden;display:grid;grid-template-rows:auto auto 1fr;min-width:0;align-content:start}
 .verify{grid-template-rows:auto auto}
 .logipal{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+.ulinfo{border:1px solid var(--rule);border-radius:6px;margin:0 0 12px;color:var(--wall);background:var(--sheet)}
+.ulay button[aria-pressed="true"]{background:var(--gold);color:#0D1B2A;border-color:var(--gold)}
 .logipal button{font:500 13px var(--body);text-transform:none;letter-spacing:0;padding:6px 10px}
 .sw{width:14px;height:11px;border:1px solid #1d2522;border-radius:2px;display:inline-block}
 .draginfo{padding:8px 14px;font:500 13px var(--mono);color:var(--fact);background:var(--fact-bg);border-top:1px solid var(--rule);min-height:2.6em}
@@ -195,7 +198,7 @@ footer p{margin:0 0 6px;max-width:90ch}
   <section aria-labelledby="t4">
     <div class="test-no">Test 4 · site plan</div>
     <h2 id="t4">Setbacks are measured, not eyeballed</h2>
-    <p class="intro">Drag the house, drainfield or well around the lot. To rotate, select one and drag its gold ⟳ handle (5° steps, hold Shift for 1°), use the ↶ ↷ buttons, or press R. Then plan the job: add crew parking, a delivery truck, staging, a dumpster and a porta-john, all to scale, and keep them off the red no-drive zones. Every clearance is measured edge to edge between the real shapes, drawn on the plan as you move, and checked against the rule. The dashed line is the building envelope, computed by moving each lot line in by its setback.</p>
+    <p class="intro">Drag the house, drainfield or well around the lot. To rotate, select one and drag its gold ⟳ handle (5° steps, hold Shift for 1°), use the ↶ ↷ buttons, or press R. Import your own PDF or photo as an underlay, set its scale, line it up and measure on it. Then plan the job: add crew parking, a delivery truck, staging, a dumpster and a porta-john, all to scale, and keep them off the red no-drive zones. Every clearance is measured edge to edge between the real shapes, drawn on the plan as you move, and checked against the rule. The dashed line is the building envelope, computed by moving each lot line in by its setback.</p>
     <div class="controls">
       <label class="num" style="display:inline-flex;align-items:center;gap:6px">Snap
         <select id="siteSnap"><option value="0.5">6"</option><option value="1" selected>1'-0"</option><option value="5">5'-0"</option></select></label>
@@ -208,6 +211,26 @@ footer p{margin:0 0 6px;max-width:90ch}
       <button type="button" class="alt" id="siteReset">Reset lot</button>
     </div>
     <div class="logipal" id="logiPal" aria-label="Add construction logistics"><span class="test-no">Add to the site:</span></div>
+    <div class="logipal ulay" aria-label="Underlay">
+      <span class="test-no">Underlay:</span>
+      <button type="button" class="alt" id="ulImport">Import PDF or image</button><input type="file" id="ulFile" accept=".pdf,application/pdf,image/png,image/jpeg" hidden>
+      <button type="button" class="alt" id="ulSample">Try the sample PDF</button>
+      <label class="num" id="ulPageWrap" hidden>Page <select id="ulPage"></select></label>
+      <label class="num">Sheet scale <select id="ulScale" disabled>
+        <option value="cal">from calibration (two clicks)</option>
+        <option value="10">1" = 10'</option><option value="20">1" = 20'</option><option value="30">1" = 30'</option><option value="40">1" = 40'</option>
+        <option value="50">1" = 50'</option><option value="60">1" = 60'</option><option value="100">1" = 100'</option>
+        <option value="8">1/8" = 1'-0"</option><option value="5.333333">3/16" = 1'-0"</option><option value="4">1/4" = 1'-0"</option><option value="2">1/2" = 1'-0"</option>
+      </select></label>
+      <button type="button" class="alt" id="ulMove" aria-pressed="false">Move / rotate</button>
+      <label class="num">Angle <input type="number" id="ulAngle" step="0.1" value="0" style="width:72px;font:14px var(--mono);padding:4px" disabled>°</label>
+      <button type="button" class="alt" id="ulCal" aria-pressed="false">Calibrate</button>
+      <button type="button" class="alt" id="ulMeasure" aria-pressed="false">Measure</button>
+      <label class="num">Fade <input type="range" id="ulOpacity" min="10" max="100" value="55" style="width:90px"></label>
+      <button type="button" class="alt" id="ulRemove">Remove</button>
+    </div>
+    <div class="draginfo ulinfo" id="ulInfo" aria-live="polite"></div>
+    <div class="logipal" id="ulCalForm" hidden><label class="num">Real distance <input id="ulCalFt" placeholder="220 or 220'-0&quot;" style="width:120px;font:14px var(--mono);padding:5px"></label> <button type="button" id="ulCalApply">Set scale</button></div>
     <div class="editor">
       <div class="panel">
         <div class="panel-h"><h3>Lot · drag to place</h3><span class="tag" id="siteStatus">—</span></div>
@@ -224,6 +247,7 @@ footer p{margin:0 0 6px;max-width:90ch}
             <li><span class="tm i">🟡 INTERP</span><span>The setback and septic distances are example rules. Use your jurisdiction's code and the health department's numbers.</span></li>
             <li><span class="tm i">🟡 INTERP</span><span>The pond edge is drawn, not delineated. A wetland scientist sets the real line.</span></li>
             <li><span class="tm i">🟡 INTERP</span><span>Soil and water table are unknown, so drainfield size and type are not checked.</span></li>
+            <li><span class="tm i">🟡 INTERP</span><span>Anything read off an imported PDF or photo — its scale, its alignment, every measurement — until it is typed into the spec.</span></li>
             <li><span class="tm i">🟡 INTERP</span><span>Truck turning paths, gate widths and ground bearing for deliveries are not checked.</span></li>
           </ul>
         </div>

@@ -42,6 +42,16 @@ the drawing can't prove. The check downloads as a report.
 
 ![Site plan: live edge-to-edge clearances against example setback rules](docs/img/site.png)
 
+**Import your own PDF or photo.** On the site plan, import a survey, plat or plan
+as a faded underlay (PDF, PNG or JPG). Pick the sheet scale printed on it
+(1″ = 30′, 1/4″ = 1′-0″, …) or calibrate by clicking both ends of a known
+dimension, then move and rotate it into place and measure on it. Everything read
+off the underlay is marked 🟡 with its ± until you type it into the spec. A
+fictional [sample boundary sketch](docs/samples/sample-boundary-sketch.pdf)
+(1″ = 30′, drawn rotated 8°) is included to try it; `tools/make_sample_pdf.py`
+rebuilds it. PDFs are read in your browser with Mozilla's
+[pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0); nothing is uploaded.
+
 **Production planner.** [`planner.html`](https://wswaldmann-lgtm.github.io/fieldcomm-draw-public/planner.html)
 is a drag-and-drop two-week look-ahead for construction crews. Drag activities
 onto crew-days; crew-hours are checked against capacity, trade and sequence
@@ -79,6 +89,7 @@ moving and get early access. Questions and ideas are welcome in
 | Path | What it is |
 |---|---|
 | `docs/` | The live demo (published to GitHub Pages) |
+| `docs/samples/` | Sample PDF for the import tool (fictional) |
 | `SPEC.md` | The spec format and room minimums (CC BY 4.0) |
 | `examples/spec/` | Example specs (CC BY 4.0) |
 | `examples/img/` | The same examples rendered by the full engine |
