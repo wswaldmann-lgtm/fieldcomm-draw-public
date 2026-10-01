@@ -21,6 +21,8 @@ rules:
   drainfield_to_building: 5
   drainfield_to_line: 10
   well_to_line: 10
+  no_drive_shoulder: 5     # keep vehicles this far off the drainfield
+  well_keep_clear: 10      # radius around the well
 items:
   - {id: house, kind: building,   label: "House",      x: 70,  y: 70,  w: 50, h: 35, rot: 0}
   - {id: df,    kind: drainfield, label: "Drainfield", x: 130, y: 30,  w: 40, h: 25, rot: 0}
@@ -95,6 +97,42 @@ items:
     return env;
   }
 
+  // ---------- construction logistics (to scale, feet) ----------
+  const LOGI = {
+    parking: { name: "Crew parking", w: 9, h: 18, color: "#5aa0e6" },
+    truck: { name: "Delivery truck", w: 8, h: 35, color: "#9aa7b3" },
+    staging: { name: "Material staging", w: 20, h: 30, color: "#b9b2a6" },
+    dumpster: { name: "Dumpster 20 yd", w: 8, h: 22, color: "#9a5a2a" },
+    toilet: { name: "Porta-john", w: 4, h: 4, color: "#29a27c" },
+  };
+  function noDrive(site) {
+    const Z = [], R = site.rules;
+    for (const f of site.items.filter((i) => i.kind === "drainfield")) {
+      const g = R.no_drive_shoulder == null ? 5 : R.no_drive_shoulder;
+      Z.push({ name: `${f.label} + ${D.ftin(g)} shoulder`, poly: itemPoly({ x: f.x, y: f.y, w: f.w + 2 * g, h: f.h + 2 * g, rot: f.rot }) });
+    }
+    for (const w of site.items.filter((i) => i.kind === "well")) {
+      const r = R.well_keep_clear == null ? 10 : R.well_keep_clear;
+      Z.push({ name: `${w.label} ${D.ftin(r)} keep-clear`, poly: Array.from({ length: 32 }, (_, k) => [w.x + r * Math.cos((k * Math.PI) / 16), w.y + r * Math.sin((k * Math.PI) / 16)]) });
+    }
+    return Z;
+  }
+  function logisticsChecks(site) {
+    const L = site.items.filter((i) => i.kind === "logistics"), zones = noDrive(site), out = [];
+    const hits = (A, B) => shapeDist(A, B).overlap;
+    L.forEach((it, k) => {
+      const P = itemPoly(it), why = [];
+      if (P.some((p) => !inside(p, site.lot))) why.push("outside the lot");
+      for (const z of zones) if (hits(P, z.poly)) why.push(`on the no-drive zone (${z.name})`);
+      if (site.pond && hits(P, site.pond)) why.push("in the pond");
+      for (const b of site.items.filter((i) => i.kind === "building" || i.kind === "drainfield"))
+        if (hits(P, itemPoly(b))) why.push(`on the ${b.label.toLowerCase()}`);
+      L.forEach((o, j) => { if (j !== k && hits(P, itemPoly(o))) why.push(`overlaps ${o.label}`); });
+      out.push({ id: "lg-" + it.id, a: it.id, label: it.label, logistics: true, why, pass: !why.length, r: {} });
+    });
+    return out;
+  }
+
   // ---------- rules ----------
   function check(site) {
     const by = (k) => site.items.find((i) => i.kind === k);
@@ -117,7 +155,7 @@ items:
     if (W) out.push({ id: "wl", a: W.id, b: "lot", label: `${W.label} → property line`, min: R.well_to_line, r: lineDist(P(W), site.lot) });
     if (H && site.pond) out.push({ id: "bw", a: H.id, b: "pond", label: `${H.label} → pond`, min: 0.01, r: shapeDist(P(H), site.pond), noOverlapOnly: true });
     out.forEach((c) => { c.pass = !c.r.outside && !c.r.overlap && c.r.d + 1e-9 >= c.min; });
-    return out;
+    return out.concat(logisticsChecks(site));
   }
 
   // ---------- spec <-> state ----------
@@ -130,6 +168,7 @@ items:
     s.items.forEach((it) => {
       ["x", "y"].forEach((k) => { if (typeof it[k] !== "number") throw new Error(`${it.label || it.id}: ${k} must be a number.`); });
       if (it.kind !== "well" && !(it.w > 0 && it.h > 0)) throw new Error(`${it.label || it.id}: w and h must be positive.`);
+      if (it.kind === "logistics" && !LOGI[it.type]) throw new Error(`${it.label || it.id}: type must be one of ${Object.keys(LOGI).join(", ")}.`);
     });
     s.setbacks = s.setbacks || {}; s.rules = s.rules || {};
     return s;
@@ -143,7 +182,9 @@ items:
     L.push("rules:"); for (const k in s.rules) L.push(`  ${k}: ${s.rules[k]}`);
     L.push("items:");
     for (const it of s.items) {
-      const o = { id: it.id, kind: it.kind, label: it.label, x: r2(it.x), y: r2(it.y) };
+      const o = { id: it.id, kind: it.kind };
+      if (it.type) o.type = it.type;
+      Object.assign(o, { label: it.label, x: r2(it.x), y: r2(it.y) });
       if (it.kind !== "well") Object.assign(o, { w: r2(it.w), h: r2(it.h), rot: r2(it.rot || 0) });
       L.push("  - " + fl(o));
     }
@@ -190,6 +231,8 @@ items:
       const c = s.pond.reduce((a, p) => [a[0] + p[0] / s.pond.length, a[1] + p[1] / s.pond.length], [0, 0]);
       text(c[0], c[1] - fs * 0.3, "POND", "fill:var(--glass);font-size:" + fs * 0.8 + "px");
     }
+    // no-drive zones
+    for (const z of noDrive(s)) el("path", { d: pathOf(z.poly), style: `fill:var(--block-bg);fill-opacity:.7;stroke:var(--block);stroke-width:${sw};stroke-dasharray:${sw * 3} ${sw * 2}` }, svg);
     // lot line lengths (from the coordinates)
     s.lot.forEach((a, i) => {
       const b = s.lot[(i + 1) % s.lot.length], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
@@ -209,6 +252,15 @@ items:
         el("circle", { cx: it.x, cy: -it.y, r: 0.9, style: "fill:var(--glass)" }, svg);
         if (isSel) el("circle", { cx: it.x, cy: -it.y, r: 4.5, style: `fill:none;stroke:var(--gold);stroke-width:${sw * 2}` }, svg);
         text(it.x, it.y + 5, it.label, "fill:var(--glass);font-weight:600");
+        continue;
+      }
+      if (it.kind === "logistics") {
+        const bad = checks.some((c) => c.a === it.id && c.logistics && !c.pass);
+        el("path", { d: pathOf(itemPoly(it)), style: `fill:${LOGI[it.type].color};fill-opacity:.85;stroke:${isSel ? "var(--gold)" : bad ? "var(--block)" : "var(--wall)"};stroke-width:${sw * (isSel || bad ? 2.6 : 0.8)}` }, svg);
+        if (Math.max(it.w, it.h) >= 8) {
+          const vert = it.h > it.w * 1.4, t = text(it.x, it.y - fs * 0.2, it.label, `fill:#1d2522;font-weight:600;font-size:${fs * 0.55}px`);
+          t.setAttribute("transform", `rotate(${-(it.rot || 0) - (vert ? 90 : 0)} ${it.x} ${-it.y})`);
+        }
         continue;
       }
       el("path", { d: pathOf(itemPoly(it)), style: `${KIND[it.kind]};stroke-width:${sw * (isSel ? 3 : 1.6)};${isSel ? "stroke:var(--gold)" : ""}` }, svg);
@@ -241,21 +293,29 @@ items:
     }
   }
   function report(s, checks) {
-    const rows = checks.filter((c) => !c.noOverlapOnly || !c.pass).map((c) => {
+    const rows = checks.filter((c) => !c.logistics && (!c.noOverlapOnly || !c.pass)).map((c) => {
       const val = c.r.outside ? "outside the lot" : c.r.overlap ? "overlapping" : `<span class="num">${D.ftin(c.r.d)}</span> edge to edge`;
       const need = c.noOverlapOnly ? "must not overlap" : `min <span class="num">${D.ftin(c.min)}</span>`;
       return [c.pass ? "f" : "b", `${c.pass ? "PASS" : "FAIL"} · ${c.label}: ${val} (${need})`];
     });
     const wdf = checks.find((c) => c.id === "wdf");
     if (wdf && !wdf.r.overlap) rows.push(["i", `Measured center to center, ${wdf.label.toLowerCase()} would read <span class="num">${D.ftin(wdf.cc)}</span> — <span class="num">${D.ftin(wdf.cc - wdf.r.d)}</span> more clearance than really exists`]);
+    const lg = checks.filter((c) => c.logistics);
+    for (const c of lg.filter((c) => !c.pass)) rows.push(["b", `FAIL · ${c.label}: ${c.why.join("; ")}`]);
+    if (lg.length) {
+      const ok = lg.filter((c) => c.pass).length, n = (t) => s.items.filter((i) => i.type === t).length;
+      if (ok) rows.push(["f", `${ok} of ${lg.length} logistics items clear of no-drive zones, pond, buildings and each other`]);
+      rows.push(["f", `On site: ${n("parking")} crew parking · ${n("truck")} truck · ${n("staging")} staging · ${n("dumpster")} dumpster · ${n("toilet")} porta-john`]);
+    }
     facts($("siteFacts"), rows);
     const fails = checks.filter((c) => !c.pass).length;
     $("siteStatus").textContent = fails ? `${fails} fail${fails > 1 ? "s" : ""} · held` : "all checks pass";
     const it = s.items.find((i) => i.id === sel);
     $("siteInfo").textContent = it
       ? `🟢 ${it.label} center at (${D.ftin(it.x)}, ${D.ftin(it.y)})${it.kind !== "well" ? ` · ${D.ftin(it.w)} × ${D.ftin(it.h)} · rotated ${r2(it.rot || 0)}°` : ""}`
-      : "Drag the house, drainfield or well. Select one to rotate it.";
+      : "Drag the house, drainfield, well or any logistics item. Select one to rotate it.";
     const rotOK = it && it.kind !== "well";
+    ["siteDup", "siteDel"].forEach((id) => { $(id).disabled = !(it && it.kind === "logistics"); });
     ["rotL", "rotR", "rotSlider"].forEach((id) => { $(id).disabled = !rotOK; });
     if (rotOK) $("rotSlider").value = it.rot || 0;
   }
@@ -342,6 +402,32 @@ items:
     a.href = URL.createObjectURL(new Blob([L.join("\n") + "\n"], { type: "text/plain" }));
     a.download = "fieldcomm-site-check.txt"; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  // palette: add to-scale logistics items
+  let uid = 0;
+  const newId = (t) => { let id; do { id = `${t}${++uid}`; } while (state.items.some((i) => i.id === id)); return id; };
+  function addLogi(type, from) {
+    if (!state) return;
+    pushHistory();
+    const t = LOGI[type], n = state.items.filter((i) => i.kind === "logistics").length;
+    const it = from ? Object.assign({}, from, { id: newId(type), x: snapV(from.x + 12), y: snapV(from.y) })
+      : { id: newId(type), kind: "logistics", type, label: t.name, x: 14 + (n % 7) * 27, y: 22 + Math.floor(n / 7) * 36, w: t.w, h: t.h, rot: 0 };
+    state.items.push(it); sel = it.id; render(state, true);
+  }
+  const pal = $("logiPal");
+  Object.entries(LOGI).forEach(([k, t]) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "alt";
+    b.innerHTML = `<span class="sw" style="background:${t.color}"></span><span></span>`;
+    b.lastChild.textContent = `${t.name} ${t.w}×${t.h}`;
+    b.addEventListener("click", () => addLogi(k));
+    pal.appendChild(b);
+  });
+  $("siteDup").addEventListener("click", () => { const it = state && state.items.find((i) => i.id === sel); if (it && it.kind === "logistics") addLogi(it.type, it); });
+  $("siteDel").addEventListener("click", () => {
+    const it = state && state.items.find((i) => i.id === sel); if (!it || it.kind !== "logistics") return;
+    pushHistory(); state.items = state.items.filter((i) => i !== it); sel = null; render(state, true);
   });
 
   ta.value = SITE_TEXT;

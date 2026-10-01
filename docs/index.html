@@ -41,6 +41,9 @@ h2{font:700 clamp(28px,4.4vw,40px)/1.05 var(--display);text-transform:uppercase;
 .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
 .panel{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;overflow:hidden;display:grid;grid-template-rows:auto auto 1fr;min-width:0;align-content:start}
 .verify{grid-template-rows:auto auto}
+.logipal{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+.logipal button{font:500 13px var(--body);text-transform:none;letter-spacing:0;padding:6px 10px}
+.sw{width:14px;height:11px;border:1px solid #1d2522;border-radius:2px;display:inline-block}
 .draginfo{padding:8px 14px;font:500 13px var(--mono);color:var(--fact);background:var(--fact-bg);border-top:1px solid var(--rule);min-height:2.6em}
 svg.edit{touch-action:none;cursor:default;user-select:none;-webkit-user-select:none}
 select{font:500 14px var(--mono);padding:6px 8px;border:1px solid var(--rule);border-radius:4px;background:var(--sheet);color:var(--wall)}
@@ -190,16 +193,19 @@ footer p{margin:0 0 6px;max-width:90ch}
   <section aria-labelledby="t4">
     <div class="test-no">Test 4 · site plan</div>
     <h2 id="t4">Setbacks are measured, not eyeballed</h2>
-    <p class="intro">Drag the house, drainfield or well around the lot, or rotate them. Every clearance is measured edge to edge between the real shapes, drawn on the plan as you move, and checked against the rule. The dashed line is the building envelope, computed by moving each lot line in by its setback.</p>
+    <p class="intro">Drag the house, drainfield or well around the lot, or rotate them. Then plan the job: add crew parking, a delivery truck, staging, a dumpster and a porta-john, all to scale, and keep them off the red no-drive zones. Every clearance is measured edge to edge between the real shapes, drawn on the plan as you move, and checked against the rule. The dashed line is the building envelope, computed by moving each lot line in by its setback.</p>
     <div class="controls">
       <label class="num" style="display:inline-flex;align-items:center;gap:6px">Snap
         <select id="siteSnap"><option value="0.5">6"</option><option value="1" selected>1'-0"</option><option value="5">5'-0"</option></select></label>
       <button type="button" class="alt" id="rotL" title="Rotate 15° left">↶ 15°</button>
       <input type="range" id="rotSlider" min="-180" max="180" step="5" value="0" aria-label="Rotation" style="width:160px">
       <button type="button" class="alt" id="rotR" title="Rotate 15° right">15° ↷</button>
+      <button type="button" class="alt" id="siteDup" disabled>Duplicate</button>
+      <button type="button" class="alt" id="siteDel" disabled>Remove</button>
       <button type="button" class="alt" id="siteUndo" disabled>Undo</button>
       <button type="button" class="alt" id="siteReset">Reset lot</button>
     </div>
+    <div class="logipal" id="logiPal" aria-label="Add construction logistics"><span class="test-no">Add to the site:</span></div>
     <div class="editor">
       <div class="panel">
         <div class="panel-h"><h3>Lot · drag to place</h3><span class="tag" id="siteStatus">—</span></div>
@@ -216,6 +222,7 @@ footer p{margin:0 0 6px;max-width:90ch}
             <li><span class="tm i">🟡 INTERP</span><span>The setback and septic distances are example rules. Use your jurisdiction's code and the health department's numbers.</span></li>
             <li><span class="tm i">🟡 INTERP</span><span>The pond edge is drawn, not delineated. A wetland scientist sets the real line.</span></li>
             <li><span class="tm i">🟡 INTERP</span><span>Soil and water table are unknown, so drainfield size and type are not checked.</span></li>
+            <li><span class="tm i">🟡 INTERP</span><span>Truck turning paths, gate widths and ground bearing for deliveries are not checked.</span></li>
           </ul>
         </div>
         <label for="siteText" class="test-no" style="display:block;margin-top:16px">Site spec (YAML, feet) · updates as you drag</label>
