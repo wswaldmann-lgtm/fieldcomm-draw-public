@@ -342,6 +342,7 @@ items:
     draw(s, checks);
     report(s, checks);
     if (writeText) ta.value = toYAML(s);
+    persistSoon();
   }
   function fromText() {
     try { state = parse(ta.value); $("siteErr").hidden = true; render(state, false); }
@@ -669,29 +670,35 @@ items:
     U.cx = (Math.min(...xs) + Math.max(...xs)) / 2; U.cy = (Math.min(...ys) + Math.max(...ys)) / 2; U.rot = 0; U.measure = null; U.pts = [];
     if (!U.scaleSrc) U.fpp = ((Math.max(...xs) - Math.min(...xs)) * 1.4) / U.W; // a guess so it's visible: not a scale
   }
-  async function openPdf(data, name, presetScale) {
+  async function openPdf(data, name, presetScale, src, restore) {
     ulInfo("Reading the PDF…");
     try {
       const lib = await loadPdfLib();
+      const keep = src || { kind: "pdf", blob: new Blob([data], { type: "application/pdf" }) }; // before pdf.js takes the bytes
       U.pdf = await lib.getDocument({ data }).promise; U.isPdf = true; U.name = name; U.scaleSrc = null;
-      await renderPdfPage(1);
+      if (!restore) { U.src = keep; U.srcDirty = true; }
+      await renderPdfPage(restore && restore.page <= U.pdf.numPages ? restore.page : 1);
       const sel = $("ulPage"); sel.innerHTML = "";
       for (let i = 1; i <= U.pdf.numPages; i++) sel.add(new Option("Page " + i, i));
       $("ulPageWrap").hidden = U.pdf.numPages < 2;
       $("ulScale").disabled = false;
+      $("ulPage").value = U.page;
+      if (restore) { applyRestore(restore); return; }
       if (presetScale) { $("ulScale").value = presetScale; applySheetScale(); } else $("ulScale").value = "cal";
       placeFresh(); setTools(true);
       ulInfo(ulStatus() + (U.scaleSrc ? "" : " Pick the sheet scale printed on it, or Calibrate."));
       render(state, false);
     } catch (e) { ulInfo(`${tmB}Couldn't read that PDF (${esc(e.message || e)}).`); }
   }
-  function openImage(file) {
+  function openImage(file, name, restore) {
     const rd = new FileReader();
     rd.onload = () => {
       const img = new Image();
       img.onload = () => {
-        U.href = rd.result; U.W = img.naturalWidth; U.H = img.naturalHeight; U.isPdf = false; U.name = file.name; U.scaleSrc = null; U.pdf = null;
+        U.href = rd.result; U.W = img.naturalWidth; U.H = img.naturalHeight; U.isPdf = false; U.name = name || file.name; U.scaleSrc = null; U.pdf = null;
         $("ulScale").value = "cal"; $("ulScale").disabled = true; $("ulPageWrap").hidden = true;
+        if (restore) { applyRestore(restore); return; }
+        U.src = { kind: "image", blob: file }; U.srcDirty = true;
         placeFresh(); setTools(true);
         ulInfo(`${tmB}<b>${esc(file.name)}</b>: a photo or scan has no built-in scale. Click <b>Calibrate</b> and pick two ends of a known dimension.`);
         render(state, false);
@@ -704,15 +711,16 @@ items:
   $("ulImport").onclick = () => $("ulFile").click();
   $("ulFile").onchange = async (e) => {
     const f = e.target.files[0]; e.target.value = ""; if (!f) return;
-    if (/pdf$/i.test(f.type) || /\.pdf$/i.test(f.name)) openPdf(new Uint8Array(await f.arrayBuffer()), f.name, null);
+    if (/pdf$/i.test(f.type) || /\.pdf$/i.test(f.name)) openPdf(new Uint8Array(await f.arrayBuffer()), f.name, null, { kind: "pdf", blob: f });
     else if (/^image\//.test(f.type)) openImage(f);
     else ulInfo(`${tmB}Use a PDF, PNG or JPG.`);
   };
   $("ulSample").onclick = async () => {
-    try { const r = await fetch("samples/sample-boundary-sketch.pdf"); openPdf(new Uint8Array(await r.arrayBuffer()), "Sample boundary sketch (fictional, 1″ = 30′)", "30"); }
+    try { const r = await fetch("samples/sample-boundary-sketch.pdf"); openPdf(new Uint8Array(await r.arrayBuffer()), "Sample boundary sketch (fictional, 1″ = 30′)", "30", { kind: "sample" }); }
     catch (e) { ulInfo(`${tmB}Couldn't load the sample.`); }
   };
   $("ulPage").onchange = async (e) => { if (!U.pdf) return; await renderPdfPage(+e.target.value); applySheetScale(); render(state, false); };
+  $("ulAlignScale").onchange = () => persistSoon();
   $("ulScale").onchange = () => { if ($("ulScale").value === "cal") { U.scaleSrc = U.scaleSrc === "sheet" ? null : U.scaleSrc; setMode("cal"); } else applySheetScale(); };
   $("ulMove").onclick = () => setMode("move");
   $("ulCal").onclick = () => setMode("cal");
@@ -739,8 +747,72 @@ items:
   setTools(false); ulInfo(ulStatus());
   window.FCUnderlay = U; // for tests
 
-  ta.value = SITE_TEXT;
+  // ================= SAVE IN THIS BROWSER =================
+  // The site spec goes in localStorage; the underlay (the original PDF or image, plus its scale,
+  // position, rotation, fade and page) goes in IndexedDB, which can hold files. Nothing leaves the browser.
+  const LS_SPEC = "fc-site-spec-v1";
+  let dbp = null, saveT = null, restoring = false, lastMeta = "";
+  function idb() {
+    return new Promise((ok, bad) => {
+      const r = indexedDB.open("fieldcomm-draw-demo", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("kv");
+      r.onsuccess = () => ok(r.result); r.onerror = () => bad(r.error);
+    });
+  }
+  async function kv(mode, fn) {
+    const db = await (dbp = dbp || idb());
+    return new Promise((ok, bad) => {
+      const tx = db.transaction("kv", mode), req = fn(tx.objectStore("kv"));
+      tx.oncomplete = () => ok(req && req.result); tx.onerror = () => bad(tx.error); tx.onabort = () => bad(tx.error);
+    });
+  }
+  const kvGet = (k) => kv("readonly", (st) => st.get(k)), kvPut = (k, v) => kv("readwrite", (st) => st.put(v, k)), kvDel = (k) => kv("readwrite", (st) => st.delete(k));
+  const savedNote = (t, ok) => { const e = $("ulSaved"); e.textContent = t; e.style.color = ok ? "var(--fact)" : "var(--block)"; };
+  function persistSoon() {
+    if (restoring) return;
+    clearTimeout(saveT); saveT = setTimeout(persistNow, 400);
+  }
+  async function persistNow() {
+    try { localStorage.setItem(LS_SPEC, ta.value); } catch (e) { /* storage off: still works, just not saved */ }
+    try {
+      if (!U.href) { if (lastMeta !== "none") { await kvDel("ul-meta"); await kvDel("ul-src"); lastMeta = "none"; savedNote("", true); } return; }
+      if (U.srcDirty) { await kvPut("ul-src", U.src); U.srcDirty = false; lastMeta = ""; }
+      const meta = { v: 1, name: U.name, isPdf: U.isPdf, page: U.page, fpp: U.fpp, cx: U.cx, cy: U.cy, rot: U.rot, opacity: U.opacity,
+        scaleSrc: U.scaleSrc, scaleSel: $("ulScale").value, alignScale: $("ulAlignScale").checked };
+      const js = JSON.stringify(meta);
+      if (js !== lastMeta) { await kvPut("ul-meta", meta); lastMeta = js; }
+      savedNote("✓ underlay saved in this browser", true);
+    } catch (e) {
+      savedNote(/quota/i.test((e && (e.name + e.message)) || "") ? "Underlay too large to save here" : "Underlay can't be saved in this browser (private window?)", false);
+    }
+  }
+  function applyRestore(m) {
+    Object.assign(U, { fpp: m.fpp, cx: m.cx, cy: m.cy, rot: m.rot, opacity: m.opacity, scaleSrc: m.scaleSrc, mode: null, pts: [], align: [], measure: null });
+    $("ulScale").value = m.scaleSel || "cal"; $("ulOpacity").value = Math.round(m.opacity * 100); $("ulAlignScale").checked = !!m.alignScale;
+    setTools(true); lastMeta = JSON.stringify(m);
+    ulInfo(ulStatus() + " <i>Restored from this browser.</i>"); savedNote("✓ underlay saved in this browser", true);
+    render(state, false);
+  }
+  async function ulRestore() {
+    let m, src;
+    try { m = await kvGet("ul-meta"); src = await kvGet("ul-src"); } catch (e) { return; }
+    if (!m || !src || m.v !== 1) return;
+    restoring = true;
+    try {
+      U.src = src; U.srcDirty = false;
+      if (src.kind === "sample") { const r = await fetch("samples/sample-boundary-sketch.pdf"); await openPdf(new Uint8Array(await r.arrayBuffer()), m.name, null, src, m); }
+      else if (m.isPdf) await openPdf(new Uint8Array(await src.blob.arrayBuffer()), m.name, null, src, m);
+      else await new Promise((ok) => { openImage(src.blob, m.name, m); const t = setInterval(() => { if (U.href) { clearInterval(t); ok(); } }, 50); setTimeout(() => { clearInterval(t); ok(); }, 5000); });
+    } catch (e) { ulInfo(`${tmB}The saved underlay couldn't be reopened. Import it again.`); }
+    finally { restoring = false; }
+  }
+
+  let savedSpec = null;
+  try { savedSpec = localStorage.getItem(LS_SPEC); } catch (e) { savedSpec = null; }
+  ta.value = savedSpec || SITE_TEXT;
   fromText();
+  if (!state) { ta.value = SITE_TEXT; fromText(); } // a broken saved spec never locks the demo
+  ulRestore();
   if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => state && render(state, false));
   window.FCSite = { check: () => state && check(state), state: () => state }; // for tests
 })();

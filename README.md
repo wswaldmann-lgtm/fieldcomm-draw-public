@@ -52,7 +52,9 @@ measure on it. Everything read
 off the underlay is marked 🟡 with its ± until you type it into the spec. A
 fictional [sample boundary sketch](docs/samples/sample-boundary-sketch.pdf)
 (1″ = 30′, drawn rotated 8°) is included to try it; `tools/make_sample_pdf.py`
-rebuilds it. PDFs are read in your browser with Mozilla's
+rebuilds it. The underlay (the original file plus its scale, position, rotation,
+fade and page) and your site-spec edits are saved in your browser, so they
+survive a reload; Remove and Reset lot clear them. PDFs are read in your browser with Mozilla's
 [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0); nothing is uploaded.
 
 **Production planner.** [`planner.html`](https://wswaldmann-lgtm.github.io/fieldcomm-draw-public/planner.html)
