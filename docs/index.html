@@ -14,12 +14,13 @@
   --ink:#0D1B2A; --paper:#F3F1EA; --sheet:#FFFFFF; --rule:#D6D9DE; --muted:#5B6776;
   --gold:#C9A84C; --wall:#1C2430; --glass:#2F6FB3; --door:#8A94A0;
   --fact:#1D7A4C; --fact-bg:#E3F3EA; --interp:#9A6A00; --interp-bg:#FBF0CF; --block:#B42318; --block-bg:#FCE7E4;
+  --lot:#F4F1E6; --water:#D6E8F5; --bldg-fill:#E3E7EC; --df:#8A6A2E; --df-fill:#EFE3C8;
   --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
   --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#0E151D;--sheet:#151F2A;--rule:#26323F;--muted:#9AA7B5;--wall:#E5EAF0;--door:#7C8896;--glass:#6FA8E6;--fact-bg:#0F2E20;--interp-bg:#33270A;--block-bg:#3A1612;--fact:#4CC38A;--interp:#E6B44A;--block:#F2785F;color-scheme:dark}}
-:root[data-theme="dark"]{--paper:#0E151D;--sheet:#151F2A;--rule:#26323F;--muted:#9AA7B5;--wall:#E5EAF0;--door:#7C8896;--glass:#6FA8E6;--fact-bg:#0F2E20;--interp-bg:#33270A;--block-bg:#3A1612;--fact:#4CC38A;--interp:#E6B44A;--block:#F2785F;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#0E151D;--sheet:#151F2A;--rule:#26323F;--muted:#9AA7B5;--wall:#E5EAF0;--door:#7C8896;--glass:#6FA8E6;--fact-bg:#0F2E20;--interp-bg:#33270A;--block-bg:#3A1612;--fact:#4CC38A;--interp:#E6B44A;--block:#F2785F;--lot:#1A232D;--water:#173247;--bldg-fill:#26313D;--df:#C9A25A;--df-fill:#3A3020;color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#0E151D;--sheet:#151F2A;--rule:#26323F;--muted:#9AA7B5;--wall:#E5EAF0;--door:#7C8896;--glass:#6FA8E6;--fact-bg:#0F2E20;--interp-bg:#33270A;--block-bg:#3A1612;--fact:#4CC38A;--interp:#E6B44A;--block:#F2785F;--lot:#1A232D;--water:#173247;--bldg-fill:#26313D;--df:#C9A25A;--df-fill:#3A3020;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--wall);font:16px/1.55 var(--body)}
 .wrap{max-width:1120px;margin:0 auto;padding-inline:16px}
@@ -39,6 +40,7 @@ h2{font:700 clamp(28px,4.4vw,40px)/1.05 var(--display);text-transform:uppercase;
 .intro{max-width:70ch;color:var(--muted);margin:0 0 18px}
 .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
 .panel{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;overflow:hidden;display:grid;grid-template-rows:auto auto 1fr;min-width:0;align-content:start}
+.verify{grid-template-rows:auto auto}
 .draginfo{padding:8px 14px;font:500 13px var(--mono);color:var(--fact);background:var(--fact-bg);border-top:1px solid var(--rule);min-height:2.6em}
 svg.edit{touch-action:none;cursor:default;user-select:none;-webkit-user-select:none}
 select{font:500 14px var(--mono);padding:6px 8px;border:1px solid var(--rule);border-radius:4px;background:var(--sheet);color:var(--wall)}
@@ -185,6 +187,44 @@ footer p{margin:0 0 6px;max-width:90ch}
     </div>
   </section>
 
+  <section aria-labelledby="t4">
+    <div class="test-no">Test 4 · site plan</div>
+    <h2 id="t4">Setbacks are measured, not eyeballed</h2>
+    <p class="intro">Drag the house, drainfield or well around the lot, or rotate them. Every clearance is measured edge to edge between the real shapes, drawn on the plan as you move, and checked against the rule. The dashed line is the building envelope, computed by moving each lot line in by its setback.</p>
+    <div class="controls">
+      <label class="num" style="display:inline-flex;align-items:center;gap:6px">Snap
+        <select id="siteSnap"><option value="0.5">6"</option><option value="1" selected>1'-0"</option><option value="5">5'-0"</option></select></label>
+      <button type="button" class="alt" id="rotL" title="Rotate 15° left">↶ 15°</button>
+      <input type="range" id="rotSlider" min="-180" max="180" step="5" value="0" aria-label="Rotation" style="width:160px">
+      <button type="button" class="alt" id="rotR" title="Rotate 15° right">15° ↷</button>
+      <button type="button" class="alt" id="siteUndo" disabled>Undo</button>
+      <button type="button" class="alt" id="siteReset">Reset lot</button>
+    </div>
+    <div class="editor">
+      <div class="panel">
+        <div class="panel-h"><h3>Lot · drag to place</h3><span class="tag" id="siteStatus">—</span></div>
+        <svg class="view edit" id="siteSvg" role="img" aria-label="Editable site plan with live setback distances"></svg>
+        <div class="draginfo" id="siteInfo" aria-live="polite"></div>
+        <ul class="facts" id="siteFacts"></ul>
+        <div style="padding:0 14px 16px;display:flex;gap:10px;flex-wrap:wrap"><button type="button" id="siteReport">Download check report</button></div>
+      </div>
+      <div>
+        <div class="panel verify">
+          <div class="panel-h"><h3>Has to be verified</h3><span class="tag">🟡 not proven by this drawing</span></div>
+          <ul class="facts" id="siteVerify">
+            <li><span class="tm i">🟡 INTERP</span><span>Lot lines come from the spec, not a boundary survey.</span></li>
+            <li><span class="tm i">🟡 INTERP</span><span>The setback and septic distances are example rules. Use your jurisdiction's code and the health department's numbers.</span></li>
+            <li><span class="tm i">🟡 INTERP</span><span>The pond edge is drawn, not delineated. A wetland scientist sets the real line.</span></li>
+            <li><span class="tm i">🟡 INTERP</span><span>Soil and water table are unknown, so drainfield size and type are not checked.</span></li>
+          </ul>
+        </div>
+        <label for="siteText" class="test-no" style="display:block;margin-top:16px">Site spec (YAML, feet) · updates as you drag</label>
+        <textarea id="siteText" spellcheck="false" wrap="off" style="min-height:300px"></textarea>
+        <div id="siteErr" class="err" hidden></div>
+      </div>
+    </div>
+  </section>
+
   <section aria-labelledby="how">
     <h2 id="how">How it works</h2>
     <div class="how">
@@ -219,5 +259,6 @@ footer p{margin:0 0 6px;max-width:90ch}
 <script src="vendor/js-yaml.min.js"></script>
 <script src="engine.js"></script>
 <script src="demo.js"></script>
+<script src="site.js"></script>
 </body>
 </html>

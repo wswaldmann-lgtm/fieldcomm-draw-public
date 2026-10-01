@@ -28,6 +28,15 @@ dimension strings follow the walls they measure.
 
 ![Dragging a wall: the spec, dimensions and code check update together](docs/img/drag.png)
 
+**Site plans: setbacks are measured, not eyeballed.** Drag or rotate a house,
+drainfield and well on an example lot. Every clearance is measured edge to edge
+between the real shapes and drawn live, and the building envelope is computed by
+moving each lot line in by its setback. A 🟡 line shows how much a center-to-center
+reading would overstate the clearance, and a "has to be verified" box lists what
+the drawing can't prove. The check downloads as a report.
+
+![Site plan: live edge-to-edge clearances against example setback rules](docs/img/site.png)
+
 ## Fact vs. interpretation
 
 Every number the demo shows is marked:
