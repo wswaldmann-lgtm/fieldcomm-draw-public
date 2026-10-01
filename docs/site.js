@@ -477,7 +477,7 @@ items:
 
   // ================= UNDERLAY: import a PDF or image, scale it, align it, measure on it =================
   // Reference only: nothing read off the underlay becomes a fact until it is typed into the spec.
-  const U = { href: null, W: 0, H: 0, fpp: 1, cx: 0, cy: 0, rot: 0, opacity: 0.55, isPdf: false, r: 1, pdf: null, page: 1,
+  const U = { align: [], href: null, W: 0, H: 0, fpp: 1, cx: 0, cy: 0, rot: 0, opacity: 0.55, isPdf: false, r: 1, pdf: null, page: 1,
     name: "", mode: null, pts: [], measure: null, scaleSrc: null };
   let ulDrag = null;
   const ftIn = (v) => D.ftin(v);
@@ -486,6 +486,45 @@ items:
   function ulWorld(px, py) { // image pixel -> world feet
     const a = rad(U.rot), vx = (px - U.W / 2) * U.fpp, vy = -(py - U.H / 2) * U.fpp;
     return [U.cx + Math.cos(a) * vx - Math.sin(a) * vy, U.cy + Math.sin(a) * vx + Math.cos(a) * vy];
+  }
+  function ulPx(p) { // world feet -> image pixel (the inverse of ulWorld)
+    const a = rad(-U.rot), dx = p[0] - U.cx, dy = p[1] - U.cy;
+    const lx = Math.cos(a) * dx - Math.sin(a) * dy, ly = Math.sin(a) * dx + Math.cos(a) * dy;
+    return [lx / U.fpp + U.W / 2, -ly / U.fpp + U.H / 2];
+  }
+  // Plan-side picks snap to real corners: lot, pond and every item.
+  function snapTarget(p) {
+    const tol = 12 * screenFt(), C = [];
+    state.lot.forEach((q, i) => C.push({ q, name: `lot corner ${i + 1}` }));
+    (state.pond || []).forEach((q) => C.push({ q, name: "pond point" }));
+    state.items.forEach((it) => itemPoly(it).forEach((q) => C.push({ q, name: `${it.label} corner` })));
+    let best = null;
+    for (const c of C) { const d = Math.hypot(c.q[0] - p[0], c.q[1] - p[1]); if (d <= tol && (!best || d < best.d)) best = { d, q: c.q.slice(), name: c.name }; }
+    return best;
+  }
+  function alignStep() {
+    const n = U.align.length;
+    return ["1 of 4: click a point on the <b>underlay</b> (e.g. a lot corner drawn on the PDF).",
+      "2 of 4: click where that point belongs on the <b>plan</b> (snaps to corners).",
+      "3 of 4: click a second point on the <b>underlay</b>, far from the first.",
+      "4 of 4: click where the second point belongs on the <b>plan</b>."][n] || "";
+  }
+  function doAlign() {
+    const [A1, B1, A2, B2] = U.align, wA1 = ulWorld(...A1.px), wA2 = ulWorld(...A2.px);
+    const la = Math.hypot(wA2[0] - wA1[0], wA2[1] - wA1[1]), lb = Math.hypot(B2.p[0] - B1.p[0], B2.p[1] - B1.p[1]);
+    if (la < 1e-6 || lb < 1e-6) { ulInfo(`${tmB}The two points are on top of each other. Pick points far apart.`); U.align = []; return; }
+    const dRot = ((Math.atan2(B2.p[1] - B1.p[1], B2.p[0] - B1.p[0]) - Math.atan2(wA2[1] - wA1[1], wA2[0] - wA1[0])) * 180) / Math.PI;
+    const k = $("ulAlignScale").checked ? lb / la : 1;
+    U.rot = ((U.rot + dRot + 540) % 360) - 180; U.fpp *= k;
+    const n1 = ulWorld(...A1.px); U.cx += B1.p[0] - n1[0]; U.cy += B1.p[1] - n1[1]; // first point lands exactly
+    const n2 = ulWorld(...A2.px), miss = Math.hypot(n2[0] - B2.p[0], n2[1] - B2.p[1]);
+    if (k !== 1) { U.scaleSrc = "cal"; $("ulScale").value = "cal"; }
+    let msg = `${tmI}Aligned: turned ${dRot >= 0 ? "+" : ""}${dRot.toFixed(2)}° to ${U.rot.toFixed(2)}°; point 1 sits on ${B1.name || "its target"}`;
+    msg += k !== 1 ? `, and the scale was set from the pair (${((k - 1) * 100).toFixed(2)}% change), so point 2 lands on its target too.`
+      : `. Point 2 lands <b class="num">${ftIn(miss)}</b> from its target with the scale held${miss > clickTol() * 2 ? " — check the scale, or tick “set scale too”" : " — within click precision"}.`;
+    ulInfo(msg + " Your picks are interpretations: zoom in on the PDF corners for a better fit.");
+    U.align = []; U.mode = null;
+    ["ulMove", "ulCal", "ulMeasure", "ulAlign"].forEach((id) => $(id).setAttribute("aria-pressed", "false")); svg.style.cursor = "default";
   }
   function ulInside(p) {
     const a = rad(-U.rot), dx = p[0] - U.cx, dy = p[1] - U.cy;
@@ -517,6 +556,13 @@ items:
     };
     if (U.pts.length) { const a = U.pts[0]; el("circle", { cx: a[0], cy: -a[1], r: sw * 3.5, style: "fill:var(--interp)" }, svg); }
     if (U.pts.length === 2) seg(U.pts[0], U.pts[1], "var(--interp)");
+    (U.align || []).forEach((a, i) => {
+      const q = a.px ? ulWorld(...a.px) : a.p, col = a.px ? "var(--interp)" : "var(--fact)";
+      el("circle", { cx: q[0], cy: -q[1], r: sw * 4, style: `fill:none;stroke:${col};stroke-width:${sw * 1.8}` }, svg);
+      const t = el("text", { x: q[0] + fs * 0.5, y: -q[1] - fs * 0.4, style: `font:700 ${fs * 0.8}px var(--mono);fill:${col};paint-order:stroke;stroke:var(--sheet);stroke-width:${fs * 0.2}px` }, svg);
+      t.textContent = (a.px ? "A" : "B") + (i < 2 ? "1" : "2");
+      if (!a.px) { const s0 = ulWorld(...U.align[i - 1].px); el("line", { x1: s0[0], y1: -s0[1], x2: q[0], y2: -q[1], style: `stroke:var(--gold);stroke-width:${sw * 1.4};stroke-dasharray:${sw * 4} ${sw * 3}` }, svg); }
+    });
     if (U.measure) {
       const [a, b] = U.measure; seg(a, b, "var(--interp)");
       const t = el("text", { x: (a[0] + b[0]) / 2 + fs * 0.4, y: -((a[1] + b[1]) / 2) - fs * 0.3, style: `font:700 ${fs}px var(--mono);fill:var(--interp);paint-order:stroke;stroke:var(--sheet);stroke-width:${fs * 0.25}px` }, svg);
@@ -524,14 +570,15 @@ items:
     }
   }
   function setMode(m) {
-    U.mode = U.mode === m ? null : m; U.pts = [];
+    U.mode = U.mode === m ? null : m; U.pts = []; U.align = [];
     $("ulCalForm").hidden = true;
-    ["ulMove", "ulCal", "ulMeasure"].forEach((id) => $(id).setAttribute("aria-pressed", String(U.mode === { ulMove: "move", ulCal: "cal", ulMeasure: "measure" }[id])));
+    ["ulMove", "ulCal", "ulMeasure", "ulAlign"].forEach((id) => $(id).setAttribute("aria-pressed", String(U.mode === { ulMove: "move", ulCal: "cal", ulMeasure: "measure", ulAlign: "align" }[id])));
     svg.style.cursor = U.mode === "move" ? "move" : U.mode ? "crosshair" : "default";
     const msg = {
       move: "Drag the underlay to line it up with the lot; drag the gold ⟳ knob to rotate it (1° steps, Shift for 0.1°). Click Move / rotate again when done.",
       cal: "Click both ends of a dimension you know on the underlay (on the sample: the 220.00′ check dimension).",
       measure: "Click two points on the underlay to measure between them.",
+      align: alignStep(),
     }[U.mode];
     ulInfo(msg ? "👉 " + msg : ulStatus());
     render(state, false);
@@ -554,6 +601,19 @@ items:
       ev.preventDefault(); svg.setPointerCapture(ev.pointerId);
       if (Math.hypot(p[0] - k[0], p[1] - k[1]) <= r * 1.8) ulDrag = { rot: true };
       else if (ulInside(p)) ulDrag = { dx: U.cx - p[0], dy: U.cy - p[1] };
+      return;
+    }
+    if (U.mode === "align") {
+      ev.preventDefault();
+      if (U.align.length % 2 === 0) {
+        if (!ulInside(p)) { ulInfo(`${tmB}That click is off the underlay. ` + alignStep()); return; }
+        U.align.push({ px: ulPx(p) });
+      } else {
+        const sn = snapTarget(p);
+        U.align.push(sn ? { p: sn.q, name: sn.name } : { p, name: null });
+      }
+      if (U.align.length === 4) doAlign(); else ulInfo("👉 " + alignStep());
+      render(state, false);
       return;
     }
     if (U.mode === "cal" || U.mode === "measure") {
@@ -640,7 +700,7 @@ items:
     };
     rd.readAsDataURL(file);
   }
-  function setTools(on) { ["ulMove", "ulCal", "ulMeasure", "ulRemove", "ulOpacity", "ulAngle"].forEach((id) => { $(id).disabled = !on; }); }
+  function setTools(on) { ["ulMove", "ulAlign", "ulAlignScale", "ulCal", "ulMeasure", "ulRemove", "ulOpacity", "ulAngle"].forEach((id) => { $(id).disabled = !on; }); }
   $("ulImport").onclick = () => $("ulFile").click();
   $("ulFile").onchange = async (e) => {
     const f = e.target.files[0]; e.target.value = ""; if (!f) return;
@@ -657,6 +717,7 @@ items:
   $("ulMove").onclick = () => setMode("move");
   $("ulCal").onclick = () => setMode("cal");
   $("ulMeasure").onclick = () => setMode("measure");
+  $("ulAlign").onclick = () => setMode("align");
   $("ulAngle").onchange = (e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) { U.rot = ((v + 540) % 360) - 180; ulInfo(ulStatus()); render(state, false); } };
   $("ulOpacity").oninput = (e) => { U.opacity = +e.target.value / 100; render(state, false); };
   $("ulRemove").onclick = () => { Object.assign(U, { href: null, pdf: null, mode: null, pts: [], measure: null, scaleSrc: null }); setTools(false); $("ulPageWrap").hidden = true; ulInfo(ulStatus()); render(state, false); };
@@ -667,7 +728,7 @@ items:
     const before = U.scaleSrc === "sheet" ? U.fpp : null;
     U.fpp *= k; U.cx = a[0] + k * (U.cx - a[0]); U.cy = a[1] + k * (U.cy - a[1]); // scale about the first click
     U.scaleSrc = "cal"; $("ulScale").value = "cal"; $("ulCalForm").hidden = true; U.mode = null; U.pts = [];
-    ["ulMove", "ulCal", "ulMeasure"].forEach((id) => $(id).setAttribute("aria-pressed", "false")); svg.style.cursor = "default";
+    ["ulMove", "ulCal", "ulMeasure", "ulAlign"].forEach((id) => $(id).setAttribute("aria-pressed", "false")); svg.style.cursor = "default";
     const tol = (clickTol() / D2) * 100;
     let msg = `${tmI}Scale set so your clicks are <b class="num">${ftIn(D2)}</b> apart (± about ${tol.toFixed(2)}% from click precision).`;
     if (before) msg += Math.abs(k - 1) < 0.0005 ? ` It matches the printed sheet scale (within ${(Math.abs(k - 1) * 100).toFixed(2)}%).` : ` The printed sheet scale was ${(Math.abs(k - 1) * 100).toFixed(2)}% ${k > 1 ? "short" : "long"} against it${Math.abs(k - 1) > 0.005 ? " — the sheet may have been printed or scanned off-scale" : ""}.`;

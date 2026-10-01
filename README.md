@@ -45,7 +45,10 @@ the drawing can't prove. The check downloads as a report.
 **Import your own PDF or photo.** On the site plan, import a survey, plat or plan
 as a faded underlay (PDF, PNG or JPG). Pick the sheet scale printed on it
 (1″ = 30′, 1/4″ = 1′-0″, …) or calibrate by clicking both ends of a known
-dimension, then move and rotate it into place and measure on it. Everything read
+dimension, then line it up with **Align 2 points** (click a point on the
+underlay, then where it belongs on the plan, twice; plan picks snap to corners;
+optionally set the scale from the pair) or move and rotate it by hand, and
+measure on it. Everything read
 off the underlay is marked 🟡 with its ± until you type it into the spec. A
 fictional [sample boundary sketch](docs/samples/sample-boundary-sketch.pdf)
 (1″ = 30′, drawn rotated 8°) is included to try it; `tools/make_sample_pdf.py`

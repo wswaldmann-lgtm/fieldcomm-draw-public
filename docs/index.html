@@ -198,7 +198,7 @@ footer p{margin:0 0 6px;max-width:90ch}
   <section aria-labelledby="t4">
     <div class="test-no">Test 4 · site plan</div>
     <h2 id="t4">Setbacks are measured, not eyeballed</h2>
-    <p class="intro">Drag the house, drainfield or well around the lot. To rotate, select one and drag its gold ⟳ handle (5° steps, hold Shift for 1°), use the ↶ ↷ buttons, or press R. Import your own PDF or photo as an underlay, set its scale, line it up and measure on it. Then plan the job: add crew parking, a delivery truck, staging, a dumpster and a porta-john, all to scale, and keep them off the red no-drive zones. Every clearance is measured edge to edge between the real shapes, drawn on the plan as you move, and checked against the rule. The dashed line is the building envelope, computed by moving each lot line in by its setback.</p>
+    <p class="intro">Drag the house, drainfield or well around the lot. To rotate, select one and drag its gold ⟳ handle (5° steps, hold Shift for 1°), use the ↶ ↷ buttons, or press R. Import your own PDF or photo as an underlay, set its scale, line it up with two points and measure on it. Then plan the job: add crew parking, a delivery truck, staging, a dumpster and a porta-john, all to scale, and keep them off the red no-drive zones. Every clearance is measured edge to edge between the real shapes, drawn on the plan as you move, and checked against the rule. The dashed line is the building envelope, computed by moving each lot line in by its setback.</p>
     <div class="controls">
       <label class="num" style="display:inline-flex;align-items:center;gap:6px">Snap
         <select id="siteSnap"><option value="0.5">6"</option><option value="1" selected>1'-0"</option><option value="5">5'-0"</option></select></label>
@@ -223,6 +223,8 @@ footer p{margin:0 0 6px;max-width:90ch}
         <option value="8">1/8" = 1'-0"</option><option value="5.333333">3/16" = 1'-0"</option><option value="4">1/4" = 1'-0"</option><option value="2">1/2" = 1'-0"</option>
       </select></label>
       <button type="button" class="alt" id="ulMove" aria-pressed="false">Move / rotate</button>
+      <button type="button" class="alt" id="ulAlign" aria-pressed="false" title="Pick two points on the underlay and where each belongs on the plan">Align 2 points</button>
+      <label class="num" title="Also stretch the underlay so both points land exactly"><input type="checkbox" id="ulAlignScale"> set scale too</label>
       <label class="num">Angle <input type="number" id="ulAngle" step="0.1" value="0" style="width:72px;font:14px var(--mono);padding:4px" disabled>°</label>
       <button type="button" class="alt" id="ulCal" aria-pressed="false">Calibrate</button>
       <button type="button" class="alt" id="ulMeasure" aria-pressed="false">Measure</button>
